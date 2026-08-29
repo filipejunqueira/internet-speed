@@ -350,3 +350,101 @@ All from this machine, an Airbnb in Leeds on a Three home broadband connection.
   and typer 0.27.2 all installed cleanly.
 - No image-in-terminal helper program is installed, so `--pretty` would have to
   talk to the terminal directly or install one.
+
+---
+
+# Phase 2 — publish reports to GitHub Pages (plan, 2026-08-29, not started)
+
+## Goal
+
+Open any `pingme` report from the phone at a stable web address, without opening
+files by hand.
+
+## Findings that shape the plan
+
+- The container can push to GitHub over SSH as `filipejunqueira` (tested with
+  `ssh -T git@github.com`). The `gh` command is not installed in the container,
+  so creating a repository and switching on Pages happens in the GitHub app on
+  the phone — two screens, about two minutes.
+- GitHub Pages on a free account serves **public** repositories only. A report
+  currently contains the public IP address, the Wi-Fi network name and the city.
+  So the published copy must be redacted, and the reports live in their own
+  public repository, separate from the code.
+- A report is 4.2 MB because plotly.js is inlined. The published copy loads
+  plotly from a CDN instead, which makes each report about 150 kB, so the
+  repository stays small over hundreds of runs.
+
+## Design
+
+Two repositories:
+
+| Repo | Visibility | Content |
+|---|---|---|
+| `internet-speed` | private or public, user's choice | this code |
+| `internet-speed-reports` | public | `index.html` + one redacted report per run |
+
+Pages serves the second one at `https://filipejunqueira.github.io/internet-speed-reports/`.
+No Actions workflow is needed: the pages are static HTML, and `pingme publish`
+regenerates the index locally before pushing. (An Actions build would only add a
+place for things to break.)
+
+New command `pingme publish [run]`:
+
+1. Build the report from the saved record with `include_plotlyjs="cdn"` and
+   **redaction on by default**: public IP → "redacted", SSID → "redacted",
+   origin marker on the map kept at city level. `--no-redact` exists but prints a
+   warning that the repo is public.
+2. Copy it to the reports checkout (`$XDG_DATA_HOME/pingme/site/`, a clone of
+   `internet-speed-reports`; cloned on first use), as `runs/<id>.html`.
+3. Regenerate `index.html`: a table of every report (label, date, ISP, down/up,
+   São Paulo p95, route verdict) newest first, linking to each page; same palette
+   and theme handling as the report. Data for the table comes from a small
+   `runs/index.json` the command also maintains, so the index never parses HTML.
+4. `git add`, commit "report <id>", push. Print the page URL.
+5. `pingme --publish` on a run does the same straight after measuring.
+
+Data structures first: `index.json` is a list of `{id, label, timestamp, isp,
+city, medium, download_mbps, upload_mbps, worst_loss_pct, sao_paulo_p95_ms,
+sao_paulo_route}` — the same fields `pingme list` already shows, so both read
+one helper in `store.py`.
+
+## Steps and who does them
+
+Subagents where the work is independent and self-contained:
+
+1. **User, on the phone (blocks step 3):** create the two repositories in the
+   GitHub app; on `internet-speed-reports` open Settings → Pages → Source:
+   "Deploy from a branch", branch `main`, folder `/ (root)`. The reports repo
+   needs one commit before Pages activates; step 4 supplies it.
+2. **Main session:** push this code to `internet-speed` (`git remote add origin
+   git@github.com:filipejunqueira/internet-speed.git && git push -u origin master`).
+3. **Subagent A (general-purpose, code):** implement `render_web.build_report(...,
+   redact=True, plotly="cdn")`, the `index.json` helper in `store.py`, the
+   `index.html` generator, and `pingme publish` / `--publish` in `cli.py`, with
+   tests: redaction removes the IP and SSID strings; the index lists every run in
+   `index.json`; the published file is under 300 kB. Runs in parallel with step 1.
+4. **Main session:** first `pingme publish` of the smoke run; open the URL on the
+   phone.
+5. **Subagent B (code-review at medium effort):** review the diff of step 3 for
+   leaks in the redaction path (anything from `snapshot` that reaches the HTML).
+6. **verify-project agent:** lint, tests, sanity checks; then commit and push.
+
+Steps 1 and 3 run at the same time; 2 needs 1's first repo; 4 needs 1 and 3;
+5 and 6 follow 4.
+
+## Success criteria
+
+- Opening `https://filipejunqueira.github.io/internet-speed-reports/` on the phone
+  shows the index with the smoke run; tapping it opens the full report with charts
+  and the map.
+- `grep -c "188.28" runs/<id>.html` is 0 and the SSID string is absent in the
+  published file (redaction check); the same report built with `--no-redact`
+  contains both (so redaction is a real switch, not a broken feature).
+- Published report file under 300 kB.
+- `uv run pytest` green including the three new tests; `uv run ruff check .` clean.
+- Invariant: the private log in `runs.jsonl` is never modified by publishing.
+
+## Out of scope
+
+Password-protecting the site (Pages cannot), a custom domain, an Actions build,
+automatic publishing on a schedule.
