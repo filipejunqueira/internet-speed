@@ -1,0 +1,360 @@
+"""One self-contained HTML report per run: tiles, charts, tables and the route map.
+
+Built only from the saved record: nothing here measures anything. Colours and
+forms follow the dataviz palette (validated for colour-blind separation).
+"""
+
+from __future__ import annotations
+
+import html
+import json
+import shutil
+import subprocess
+
+import plotly.graph_objects as go
+from plotly.offline import get_plotlyjs
+
+from .render_map import map_figure, trace_run
+from .store import data_dir
+
+TARGET_ORDER = ["router", "isp-hop", "london", "madrid", "us-east", "sao-paulo"]
+
+# Light-mode hexes; JS swaps to the dark step of the same hue when the page is dark.
+LIGHT = {"idle": "#2a78d6", "download": "#eb6834", "upload": "#1baf7a", "busy": "#eb6834",
+         "bar": "#2a78d6", "range": "#86b6ef", "muted": "#898781",
+         "london": "#2a78d6", "madrid": "#eb6834", "us-east": "#1baf7a", "sao-paulo": "#eda100",
+         "router": "#898781", "isp-hop": "#898781"}
+DARK = {"idle": "#3987e5", "download": "#d95926", "upload": "#199e70", "busy": "#d95926",
+        "bar": "#3987e5", "range": "#1c5cab", "muted": "#898781",
+        "london": "#3987e5", "madrid": "#d95926", "us-east": "#199e70", "sao-paulo": "#c98500",
+        "router": "#898781", "isp-hop": "#898781"}
+STATUS = {"good": "#0ca30c", "warning": "#fab219", "serious": "#ec835a", "critical": "#d03b3b"}
+CHROME = {"light": {"surface": "#fcfcfb", "page": "#f9f9f7", "ink": "#0b0b0b", "ink2": "#52514e",
+                    "muted": "#898781", "grid": "#e1e0d9", "axis": "#c3c2b7",
+                    "border": "rgba(11,11,11,0.10)"},
+          "dark": {"surface": "#1a1a19", "page": "#0d0d0d", "ink": "#ffffff", "ink2": "#c3c2b7",
+                   "muted": "#898781", "grid": "#2c2c2a", "axis": "#383835",
+                   "border": "rgba(255,255,255,0.10)"}}
+FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif'
+PLOT_CONFIG = {"displaylogo": False, "responsive": True,
+               "modeBarButtonsToRemove": ["lasso2d", "select2d"]}
+
+# pingme's own thresholds, stated in the footnote so nobody mistakes them for a standard
+LOSS_WARN, LOSS_CRIT = 1.0, 5.0
+PENALTY_WARN, PENALTY_CRIT = 50.0, 200.0
+
+
+def _fmt(v, nd: int = 1, unit: str = "") -> str:
+    return "—" if v is None else f"{v:,.{nd}f}{unit}"
+
+
+def _layout(title: str | None = None, height: int = 260, legend: bool = True) -> dict:
+    c = CHROME["light"]
+    axis = {"gridcolor": c["grid"], "linecolor": c["axis"], "zeroline": False,
+            "tickfont": {"color": c["muted"], "size": 11}, "title_font": {"color": c["ink2"]}}
+    return {"template": "none", "paper_bgcolor": "rgba(0,0,0,0)",
+            "plot_bgcolor": "rgba(0,0,0,0)", "font": {"family": FONT, "color": c["ink"]},
+            "margin": {"l": 48, "r": 12, "t": 36 if title else 12, "b": 40}, "height": height,
+            "title": {"text": title or "", "font": {"size": 13, "color": c["ink2"]}, "x": 0},
+            "xaxis": axis, "yaxis": dict(axis), "showlegend": legend,
+            "legend": {"orientation": "h", "y": 1.12, "x": 0, "font": {"size": 11}},
+            "hoverlabel": {"font": {"family": FONT}}}
+
+
+def _div(fig: go.Figure, div_id: str) -> str:
+    return fig.to_html(full_html=False, include_plotlyjs=False, div_id=div_id,
+                       config=PLOT_CONFIG, default_height=fig.layout.height or 260)
+
+
+def _phase_bands(fig: go.Figure, marks: dict) -> None:
+    dl, ul, back = marks.get("download"), marks.get("upload"), marks.get("idle-again")
+    for start, end, role in ((dl, ul, "download"), (ul, back, "upload")):
+        if start is not None and end is not None:
+            fig.add_vrect(x0=start, x1=end, fillcolor=LIGHT[role], opacity=0.08, line_width=0,
+                          annotation_text=role, annotation_position="top left",
+                          annotation_font={"size": 10, "color": CHROME["light"]["muted"]})
+
+
+def _hist(entry: dict) -> go.Figure:
+    fig = go.Figure()
+    idle = [s[1] for s in entry["samples"] if s[3] == "idle"]
+    busy = [s[1] for s in entry["samples"] if s[3] in ("download", "upload")]
+    for vals, role, name in ((idle, "idle", "idle"), (busy, "busy", "during speed test")):
+        if vals:
+            fig.add_trace(go.Histogram(x=vals, name=name, nbinsx=40, opacity=0.8,
+                                       marker={"color": LIGHT[role]}, meta={"role": role},
+                                       hovertemplate="%{x} ms: %{y} probes<extra>" + name + "</extra>"))
+    a = entry["all"]
+    c = CHROME["light"]
+    for key, label in (("min_ms", "best"), ("median_ms", "median"), ("p95_ms", "p95")):
+        if a.get(key) is not None:
+            fig.add_vline(x=a[key], line={"color": c["muted"], "width": 1, "dash": "dot"},
+                          annotation_text=f"{label} {a[key]:.0f}", annotation_position="top",
+                          annotation_font={"size": 10, "color": c["ink2"]})
+    fig.update_layout(_layout("round trip, ms (probes per bin)"), barmode="overlay", bargap=0.06)
+    return fig
+
+
+def _timeline(entry: dict, marks: dict) -> go.Figure:
+    fig = go.Figure()
+    for phase in ("idle", "download", "upload"):
+        pts = [(s[2], s[1]) for s in entry["samples"] if s[3] == phase]
+        if pts:
+            fig.add_trace(go.Scatter(x=[p[0] for p in pts], y=[p[1] for p in pts], mode="markers",
+                                     name=phase, marker={"color": LIGHT[phase], "size": 5},
+                                     meta={"role": phase},
+                                     hovertemplate="%{x:.1f} s: %{y} ms<extra>" + phase + "</extra>"))
+    _phase_bands(fig, marks)
+    fig.update_layout(_layout("round trip over the run, ms"))
+    fig.update_xaxes(title_text="seconds")
+    return fig
+
+
+def _throughput(sp: dict) -> go.Figure:
+    samples = sp["samples_mbps"]
+    xs = [i * 0.25 for i in range(len(samples))]
+    fig = go.Figure(go.Scatter(x=xs, y=samples, mode="lines", line={"color": LIGHT["bar"], "width": 2},
+                               name=sp["direction"], meta={"role": "bar"},
+                               hovertemplate="%{x:.2f} s: %{y:.1f} Mbit/s<extra></extra>"))
+    fig.update_layout(_layout(f"{sp['direction']} — {sp['mbps']:.1f} Mbit/s average", height=200,
+                              legend=False))
+    fig.update_xaxes(title_text="seconds")
+    return fig
+
+
+def _comparison(targets: dict, order: list[str]) -> go.Figure:
+    names = [n for n in order if n in targets and targets[n]["all"]["median_ms"] is not None]
+    med = [targets[n]["all"]["median_ms"] for n in names]
+    p95 = [targets[n]["all"]["p95_ms"] for n in names]
+    fig = go.Figure()
+    fig.add_trace(go.Bar(y=names, x=med, orientation="h", name="median",
+                         marker={"color": LIGHT["bar"], "cornerradius": 4}, meta={"role": "bar"},
+                         text=[f"{m:.0f}" for m in med], textposition="outside",
+                         textfont={"color": CHROME["light"]["ink2"], "size": 11},
+                         hovertemplate="%{y}: median %{x:.1f} ms<extra></extra>"))
+    fig.add_trace(go.Scatter(y=names, x=p95, mode="markers", name="p95",
+                             marker={"color": LIGHT["range"], "size": 10, "symbol": "line-ns",
+                                     "line": {"width": 2, "color": LIGHT["range"]}},
+                             meta={"role": "range"},
+                             hovertemplate="%{y}: p95 %{x:.1f} ms<extra></extra>"))
+    fig.update_layout(_layout("median round trip with p95 mark, ms", height=60 + 34 * len(names)),
+                      bargap=0.35)
+    fig.update_yaxes(autorange="reversed")
+    return fig
+
+
+def _status(value: float | None, warn: float, crit: float) -> tuple[str, str]:
+    if value is None:
+        return "muted", "?"
+    if value >= crit:
+        return "critical", "✕"
+    if value >= warn:
+        return "warning", "▲"
+    return "good", "✓"
+
+
+def _tile(label: str, value: str, sub: str = "", status: tuple[str, str] | None = None) -> str:
+    badge = ""
+    if status and status[0] != "muted":
+        badge = (f'<span class="badge {status[0]}" title="{status[0]}">'
+                 f'{status[1]} {status[0]}</span>')
+    return (f'<div class="tile"><div class="label">{html.escape(label)}</div>'
+            f'<div class="value">{value}</div><div class="sub">{html.escape(sub)} {badge}</div></div>')
+
+
+def _stats_table(entry: dict) -> str:
+    cols = [("loss_pct", "loss %"), ("min_ms", "best"), ("median_ms", "median"),
+            ("mean_ms", "mean"), ("p95_ms", "p95"), ("p99_ms", "p99"), ("max_ms", "max"),
+            ("stdev_ms", "st.dev"), ("jitter_ms", "jitter"), ("received", "replies"),
+            ("sent", "sent")]
+    head = "".join(f"<th>{h}</th>" for _, h in cols)
+    rows = ""
+    for phase in ("all", "idle", "busy"):
+        s = entry[phase]
+        cells = "".join(f"<td>{_fmt(s.get(k), 0 if k in ('received', 'sent') else 1)}</td>"
+                        for k, _ in cols)
+        rows += f"<tr><th>{phase}</th>{cells}</tr>"
+    return (f'<details><summary>table</summary><table class="stats"><thead><tr><th></th>{head}'
+            f"</tr></thead><tbody>{rows}</tbody></table></details>")
+
+
+def _target_section(name: str, entry: dict, marks: dict, i: int) -> str:
+    a = entry["all"]
+    loss_status = _status(a["loss_pct"], LOSS_WARN, LOSS_CRIT)
+    penalty = None
+    if entry["busy"]["p95_ms"] is not None and entry["idle"]["p95_ms"] is not None:
+        penalty = entry["busy"]["p95_ms"] - entry["idle"]["p95_ms"]
+    pen_status = _status(penalty, PENALTY_WARN, PENALTY_CRIT)
+    physics = entry.get("physics") or {}
+    facts = [f"loss {_fmt(a['loss_pct'], 1, '%')}", f"best {_fmt(a['min_ms'])} ms",
+             f"median {_fmt(a['median_ms'])} ms", f"p95 {_fmt(a['p95_ms'])} ms",
+             f"jitter {_fmt(a['jitter_ms'])} ms"]
+    if penalty is not None:
+        facts.append(f"under-load penalty {penalty:+.0f} ms "
+                     f'<span class="badge {pen_status[0]}">{pen_status[1]} {pen_status[0]}</span>')
+    if physics.get("most_consistent"):
+        facts.append(f"route: <b>{html.escape(physics['most_consistent'])}</b> "
+                     f"(~{physics['effective_ms']:.0f} ms after local overhead)")
+    route = (entry.get("route") or {}).get("dev")
+    if entry.get("error") and not entry["samples"]:
+        body = f'<p class="error">{html.escape(entry["error"])}</p>'
+    else:
+        body = (f'<div class="pair">{_div(_hist(entry), f"h{i}")}{_div(_timeline(entry, marks), f"t{i}")}'
+                f"</div>{_stats_table(entry)}")
+    return (f'<section class="card" id="target-{name}"><h2>{name} '
+            f'<span class="ip">{entry["ip"]}{" · via " + route if route else ""}</span>'
+            f'<span class="badge {loss_status[0]}">{loss_status[1]} loss</span></h2>'
+            f'<p class="facts">{" · ".join(facts)}</p>{body}</section>')
+
+
+def _css() -> str:
+    lt, dk = CHROME["light"], CHROME["dark"]
+
+    def block(c, dark=False):
+        return (f"--surface:{c['surface']};--page:{c['page']};--ink:{c['ink']};--ink2:{c['ink2']};"
+                f"--muted:{c['muted']};--grid:{c['grid']};--border:{c['border']};"
+                f"color-scheme:{'dark' if dark else 'light'};")
+
+    return f"""
+:root{{{block(lt)}}}
+@media (prefers-color-scheme: dark){{:root:not([data-theme="light"]){{{block(dk, True)}}}}}
+:root[data-theme="dark"]{{{block(dk, True)}}}
+body{{margin:0;background:var(--page);color:var(--ink);font-family:{FONT};font-size:14px;line-height:1.45}}
+main{{max-width:1180px;margin:0 auto;padding:20px 16px 48px}}
+h1{{font-size:20px;margin:0 0 2px}} h2{{font-size:15px;margin:0 0 6px}} h3{{font-size:13px;color:var(--ink2);margin:14px 0 6px;font-weight:600}}
+.meta{{color:var(--ink2);margin:0 0 16px}}
+.card{{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin:0 0 14px}}
+.tiles{{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin:0 0 14px}}
+.tile{{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px}}
+.tile .label{{color:var(--ink2);font-size:12px}} .tile .value{{font-size:28px;font-weight:600;margin:2px 0}}
+.tile .sub{{color:var(--muted);font-size:12px}}
+.pair{{display:grid;grid-template-columns:1fr 1fr;gap:12px}} @media (max-width:820px){{.pair{{grid-template-columns:1fr}}}}
+.ip{{color:var(--muted);font-weight:400;font-size:12px;margin-left:8px}}
+.facts{{color:var(--ink2);margin:0 0 8px}}
+.badge{{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:999px;margin-left:8px;color:#fff;vertical-align:middle}}
+.badge.good{{background:{STATUS['good']}}} .badge.warning{{background:{STATUS['warning']};color:#0b0b0b}}
+.badge.serious{{background:{STATUS['serious']}}} .badge.critical{{background:{STATUS['critical']}}}
+details{{margin:4px 0 0}} summary{{cursor:pointer;color:var(--muted);font-size:12px}}
+table.stats{{border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:12px;margin-top:6px;width:100%}}
+table.stats th,table.stats td{{text-align:right;padding:3px 8px;border-bottom:1px solid var(--grid)}} table.stats th:first-child{{text-align:left}}
+.error{{color:{STATUS['critical']}}} .foot{{color:var(--muted);font-size:12px;margin-top:20px}}
+.plotly-graph-div{{width:100%}}
+"""
+
+
+def _theme_js() -> str:
+    """Swap every trace to the dark steps of the same hues when the page is dark."""
+    return f"""
+(function(){{
+  const LIGHT={json.dumps(LIGHT)}, DARK={json.dumps(DARK)}, C={json.dumps(CHROME)};
+  function isDark(){{const t=document.documentElement.dataset.theme;
+    return t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);}}
+  function apply(){{
+    const dark=isDark(), pal=dark?DARK:LIGHT, c=dark?C.dark:C.light;
+    document.querySelectorAll('.plotly-graph-div').forEach(div=>{{
+      if(!div.data) return;
+      div.data.forEach((tr,i)=>{{
+        const role=tr.meta&&tr.meta.role; if(!role||!pal[role]) return;
+        const upd={{}};
+        if(tr.marker){{upd['marker.color']=pal[role]; if(tr.marker.line) upd['marker.line.color']=pal[role];}}
+        if(tr.line) upd['line.color']=pal[role];
+        Plotly.restyle(div, upd, [i]);
+      }});
+      Plotly.relayout(div, {{'font.color':c.ink,'xaxis.gridcolor':c.grid,'yaxis.gridcolor':c.grid,
+        'xaxis.linecolor':c.axis,'yaxis.linecolor':c.axis,'title.font.color':c.ink2,
+        'geo.bgcolor':'rgba(0,0,0,0)','geo.landcolor':dark?'#2a2a28':'#f2efe9',
+        'geo.oceancolor':dark?'#151a20':'#dbe9f6','geo.countrycolor':dark?'#444':'#bbb',
+        'geo.coastlinecolor':dark?'#555':'#999'}});
+    }});
+  }}
+  apply(); matchMedia('(prefers-color-scheme: dark)').addEventListener('change', apply);
+  new MutationObserver(apply).observe(document.documentElement,{{attributes:true,attributeFilter:['data-theme']}});
+}})();
+"""
+
+
+def build_report(run: dict, traces: dict | None = None) -> str:
+    """Return the full HTML for a run. `traces` is the optional route-trace result."""
+    s, a = run["snapshot"], run["analysis"]
+    pub = s.get("public") or {}
+    targets = a["targets"]
+    order = sorted(targets, key=lambda n: TARGET_ORDER.index(n) if n in TARGET_ORDER else 99)
+    speeds = {x["direction"]: x for x in run["speed"]}
+    worst_loss = max((t["all"]["loss_pct"] for t in targets.values()), default=None)
+    sp_phys = (targets.get("sao-paulo") or {}).get("physics") or {}
+
+    if s.get("medium") == "wifi" and s.get("wifi"):
+        w = s["wifi"]
+        conn = (f"Wi-Fi {html.escape(str(w.get('ssid')))} · {w.get('generation') or ''} · "
+                f"{_fmt(w.get('freq_mhz'), 0)} MHz ch{w.get('channel')} {w.get('width_mhz')} MHz · "
+                f"{w.get('signal_dbm')} dBm · link ↓{_fmt(w.get('rx_bitrate_mbps'), 0)} "
+                f"↑{_fmt(w.get('tx_bitrate_mbps'), 0)} Mbit/s")
+    elif s.get("medium") == "ethernet" and s.get("ethernet"):
+        e = s["ethernet"]
+        conn = f"Ethernet {e.get('link_speed_mbps')} Mbit/s {e.get('duplex')} duplex"
+    else:
+        conn = "connection type unknown"
+    meta = (f"{run['timestamp'][:19].replace('T', ' ')} UTC · {run['duration_s']:.0f} s run · {conn} · "
+            f"public {pub.get('ip')} ({html.escape(str(pub.get('isp')))}, {pub.get('city')}, "
+            f"{pub.get('country')})")
+
+    tiles = [
+        _tile("download", f"{speeds.get('download', {}).get('mbps', 0):.1f} <small>Mbit/s</small>",
+              f"{speeds.get('download', {}).get('bytes_total', 0) / 1e6:.0f} MB in "
+              f"{speeds.get('download', {}).get('seconds', 0):.0f} s"),
+        _tile("upload", f"{speeds.get('upload', {}).get('mbps', 0):.1f} <small>Mbit/s</small>",
+              f"{speeds.get('upload', {}).get('bytes_total', 0) / 1e6:.0f} MB in "
+              f"{speeds.get('upload', {}).get('seconds', 0):.0f} s"),
+        _tile("worst packet loss", _fmt(worst_loss, 1, "%"), "across all targets",
+              _status(worst_loss, LOSS_WARN, LOSS_CRIT)),
+        _tile("local overhead", f"{a['local_overhead_ms']:.0f} <small>ms</small>",
+              a["local_overhead_how"]),
+        _tile("São Paulo route", html.escape(sp_phys.get("most_consistent") or "—"),
+              f"~{sp_phys.get('effective_ms', 0):.0f} ms after local overhead"
+              if sp_phys else "no measurement"),
+    ]
+    thr = "".join(_div(_throughput(sp), f"s-{sp['direction']}") for sp in run["speed"]
+                  if sp["samples_mbps"])
+    sections = "".join(_target_section(n, targets[n], run.get("phase_marks_s", {}), i)
+                       for i, n in enumerate(order))
+    comparison = _div(_comparison(targets, order), "cmp")
+    map_html = ""
+    if traces:
+        fig = map_figure(run, traces)
+        fig.update_layout(height=520, margin={"l": 0, "r": 0, "t": 30, "b": 0},
+                          paper_bgcolor="rgba(0,0,0,0)", font={"family": FONT})
+        map_html = f'<section class="card"><h2>route map</h2>{_div(fig, "map")}</section>'
+
+    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>pingme — {html.escape(run['id'])}</title><style>{_css()}</style>
+<script>{get_plotlyjs()}</script></head><body><main>
+<h1>pingme — {html.escape(run['id'])}</h1><p class="meta">{meta}</p>
+<div class="tiles">{''.join(tiles)}</div>
+<section class="card"><h2>throughput</h2><div class="pair">{thr}</div></section>
+{sections}
+<section class="card"><h2>targets compared</h2>{comparison}</section>
+{map_html}
+<p class="foot">Round trips measured with the system ping at 5 per second per target; the speed
+test ran against Cloudflare while probing continued. "Under-load penalty" is the busy p95
+minus the idle p95. Badges use pingme's own thresholds: loss ≥{LOSS_WARN:g} % warning,
+≥{LOSS_CRIT:g} % critical; penalty ≥{PENALTY_WARN:g} ms warning, ≥{PENALTY_CRIT:g} ms critical.
+Route verdicts compare the best round trip, minus local overhead, with the time light needs
+through fibre along each candidate cable path (×1.3 for real cable routing).</p>
+</main><script>{_theme_js()}</script></body></html>"""
+
+
+def write_report(run: dict, status=lambda msg: None, with_map: bool = True) -> str:
+    traces = trace_run(run, status) if with_map else None
+    reports = data_dir() / "reports"
+    reports.mkdir(exist_ok=True)
+    path = reports / f"{run['id']}.html"
+    path.write_text(build_report(run, traces), encoding="utf-8")
+    opener = shutil.which("xdg-open")
+    if opener:
+        try:
+            subprocess.Popen([opener, str(path)], stdout=subprocess.DEVNULL,
+                             stderr=subprocess.DEVNULL)
+        except OSError:
+            pass
+    return str(path)
