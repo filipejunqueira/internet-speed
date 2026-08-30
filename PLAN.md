@@ -384,9 +384,11 @@ Two repositories:
 | `internet-speed-reports` | public | `index.html` + one redacted report per run |
 
 Pages serves the second one at `https://filipejunqueira.github.io/internet-speed-reports/`.
-No Actions workflow is needed: the pages are static HTML, and `pingme publish`
-regenerates the index locally before pushing. (An Actions build would only add a
-place for things to break.)
+Deployment: the user asked for an Actions workflow so builds are visible.
+`.github/workflows/pages.yml` in the reports repo deploys the whole repo on every
+push to `main` (Pages source set to "GitHub Actions"). Verified 2026-08-29: the
+placeholder index shows at the site address. `pingme publish` still regenerates
+the index locally; the workflow only uploads.
 
 New command `pingme publish [run]`:
 
@@ -412,11 +414,13 @@ one helper in `store.py`.
 
 Subagents where the work is independent and self-contained:
 
-1. **User, on the phone (blocks step 3):** create the two repositories in the
+1. [x] 2026-08-29 — both repos exist; code pushed to `internet-speed` (`master`);
+   reports repo has the placeholder index + workflow; Pages live.
+   **User, on the phone (blocks step 3):** create the two repositories in the
    GitHub app; on `internet-speed-reports` open Settings → Pages → Source:
    "Deploy from a branch", branch `main`, folder `/ (root)`. The reports repo
    needs one commit before Pages activates; step 4 supplies it.
-2. **Main session:** push this code to `internet-speed` (`git remote add origin
+2. [x] **Main session:** push this code to `internet-speed` (`git remote add origin
    git@github.com:filipejunqueira/internet-speed.git && git push -u origin master`).
 3. **Subagent A (general-purpose, code):** implement `render_web.build_report(...,
    redact=True, plotly="cdn")`, the `index.json` helper in `store.py`, the

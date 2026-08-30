@@ -2,8 +2,8 @@
 
 ## Now
 
-- [ ] User runs `claude remote-control --name internet-speed` in `~/code/internet-speed` (phone access)
-- [ ] User opens `notes/reports/smoke_2026-08-29T21-02-51Z.html` and reviews the web report design
+- [ ] Phase 2 step 3: implement `pingme publish` (redaction, CDN plotly, index.json, index.html, push) — see PLAN.md
+- [ ] Phase 2 step 4: publish the smoke run; open it on the phone; review the report design there
 - [ ] Full 60 s run into the real log from the user's terminal: `uv run pingme --label airbnb_leeds --web`
 
 ## Next
@@ -22,4 +22,5 @@
 
 ## Done
 
+- 2026-08-29 — Remote Control running; GitHub repos `internet-speed` (code) and `internet-speed-reports` (Pages via Actions) live with placeholder index.
 - 2026-08-29 — v1 built: measurement, terminal plots, log, web report with validated palette, route map, physics route verdict. 14 tests, ruff clean.
