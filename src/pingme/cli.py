@@ -8,7 +8,7 @@ from rich.console import Console
 from . import __version__
 from .render_tui import render
 from .run import Timing, run
-from .store import find_run, load_runs
+from .store import find_run, load_runs, summary_row
 
 app = typer.Typer(add_completion=False, invoke_without_command=True, no_args_is_help=False,
                   help="Measure, plot and log the quality of the current internet connection.")
@@ -29,6 +29,8 @@ def main(
     longer: bool = typer.Option(False, "--longer", help="10 min run."),
     web: bool = typer.Option(False, "--web", "--map",
                              help="Afterwards, open the full web report (charts, tables, map)."),
+    publish: bool = typer.Option(False, "--publish",
+                                 help="Afterwards, publish the redacted report to GitHub Pages."),
     version: bool = typer.Option(False, "--version"),
 ) -> None:
     if version:
@@ -43,12 +45,16 @@ def main(
         total = 120.0
     elif longer:
         total = 600.0
-    record = run(label, Timing(total, speed_s), status=_status)
+    record = run(label, Timing(total, speed_s), status=_status, trace=web or publish)
     render(record, console)
     if web:
         from .render_web import write_report
         path = write_report(record, status=_status)
         console.print(f"report written to {path}")
+    if publish:
+        from .publish import publish as publish_run
+        url = publish_run(record, status=_status)
+        console.print(f"published at {url}")
 
 
 @app.command("show")
@@ -59,11 +65,6 @@ def show(run_ref: str | None = typer.Argument(None, help="Run id or prefix; late
         console.print("[red]no such run[/red]")
         raise typer.Exit(1)
     render(rec, console)
-
-
-def _p95(tg: dict, n: str) -> str:
-    e = tg.get(n)
-    return "—" if not e or e["all"]["p95_ms"] is None else f"{e['all']['p95_ms']:.0f}"
 
 
 def _metric(rec: dict, n: str, metric: str) -> str:
@@ -78,16 +79,14 @@ def list_runs():
     from rich.table import Table
 
     t = Table()
-    for c in ("id", "medium", "isp", "down", "up", "london p95", "sao-paulo p95", "verdict"):
+    for c in ("id", "medium", "isp", "down", "up", "sao-paulo p95", "verdict"):
         t.add_column(c)
     for r in load_runs():
-        s = r["snapshot"]
-        sp = {x["direction"]: x["mbps"] for x in r["speed"]}
-        tg = r["analysis"]["targets"]
-        verdict = ((tg.get("sao-paulo") or {}).get("physics") or {}).get("most_consistent") or ""
-        t.add_row(r["id"], s.get("medium") or "?", (s.get("public") or {}).get("isp") or "?",
-                  f"{sp.get('download', 0):.1f}", f"{sp.get('upload', 0):.1f}",
-                  _p95(tg, "london"), _p95(tg, "sao-paulo"), verdict)
+        row = summary_row(r)
+        p95 = row["sao_paulo_p95_ms"]
+        t.add_row(row["id"], row["medium"] or "?", row["isp"] or "?",
+                  f"{row['download_mbps']:.1f}", f"{row['upload_mbps']:.1f}",
+                  "—" if p95 is None else f"{p95:.0f}", row["sao_paulo_route"] or "")
     console.print(t)
 
 
@@ -135,6 +134,28 @@ def web_cmd(
         raise typer.Exit(1)
     path = write_report(rec, status=_status, with_map=not no_map)
     console.print(f"report written to {path}")
+
+
+@app.command("publish")
+def publish_cmd(
+    run_ref: str | None = typer.Argument(None, help="Run id or prefix; latest if omitted."),
+    no_redact: bool = typer.Option(False, "--no-redact",
+                                   help="Keep the public IP and Wi-Fi name in the published page."),
+    no_map: bool = typer.Option(False, "--no-map", help="Skip the route trace and the map."),
+):
+    """Publish the report of a saved run to the public GitHub Pages site."""
+    from .publish import REPO_URL
+    from .publish import publish as publish_run
+
+    rec = find_run(run_ref)
+    if rec is None:
+        console.print("[red]no such run[/red]")
+        raise typer.Exit(1)
+    if no_redact:
+        console.print(f"[yellow]warning:[/yellow] publishing the public IP and Wi-Fi name "
+                      f"to the public repository {REPO_URL}")
+    url = publish_run(rec, status=_status, redact=not no_redact, with_map=not no_map)
+    console.print(f"published at {url}")
 
 
 @app.command("map")

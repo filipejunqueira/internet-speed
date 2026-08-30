@@ -6,15 +6,18 @@ forms follow the dataviz palette (validated for colour-blind separation).
 
 from __future__ import annotations
 
+import copy
 import html
 import json
 import shutil
 import subprocess
+from typing import Literal
 
 import plotly.graph_objects as go
+from plotly import __version__ as PLOTLY_VERSION
 from plotly.offline import get_plotlyjs
 
-from .render_map import map_figure, trace_run
+from .render_map import map_figure, traced_path, traces_for
 from .store import data_dir
 
 TARGET_ORDER = ["router", "isp-hop", "london", "madrid", "us-east", "sao-paulo"]
@@ -178,7 +181,8 @@ def _stats_table(entry: dict) -> str:
             f"</tr></thead><tbody>{rows}</tbody></table></details>")
 
 
-def _target_section(name: str, entry: dict, marks: dict, i: int) -> str:
+def _target_section(name: str, entry: dict, marks: dict, i: int,
+                    trace_entry: dict | None = None) -> str:
     a = entry["all"]
     loss_status = _status(a["loss_pct"], LOSS_WARN, LOSS_CRIT)
     penalty = None
@@ -192,8 +196,11 @@ def _target_section(name: str, entry: dict, marks: dict, i: int) -> str:
     if penalty is not None:
         facts.append(f"under-load penalty {penalty:+.0f} ms "
                      f'<span class="badge {pen_status[0]}">{pen_status[1]} {pen_status[0]}</span>')
+    path = traced_path(trace_entry) if trace_entry else None
+    if path:
+        facts.append("traced path: <b>" + html.escape(path) + "</b>")
     if physics.get("most_consistent"):
-        facts.append(f"route: <b>{html.escape(physics['most_consistent'])}</b> "
+        facts.append(f"timing estimate: {html.escape(physics['most_consistent'])} "
                      f"(~{physics['effective_ms']:.0f} ms after local overhead)")
     route = (entry.get("route") or {}).get("dev")
     if entry.get("error") and not entry["samples"]:
@@ -273,8 +280,36 @@ def _theme_js() -> str:
 """
 
 
-def build_report(run: dict, traces: dict | None = None) -> str:
-    """Return the full HTML for a run. `traces` is the optional route-trace result."""
+def redact(run: dict) -> dict:
+    """A deep copy of the run with the public IP and the Wi-Fi name replaced by "redacted"."""
+    out = copy.deepcopy(run)
+    s = out.get("snapshot") or {}
+    if s.get("public"):
+        s["public"]["ip"] = "redacted"
+    if s.get("wifi"):
+        s["wifi"]["ssid"] = "redacted"
+    return out
+
+
+# cdn.plot.ly does not serve the plotly.js that ships with this plotly (checked: 7.0.0 → 403),
+# so the site keeps its own copy of the exact bundled version, written once by publish().
+PLOTLY_ASSET = f"assets/plotly-{PLOTLY_VERSION}.min.js"
+
+
+def _plotly_script(plotly_mode: Literal["inline", "external"], src: str) -> str:
+    if plotly_mode == "external":
+        return f'<script src="{html.escape(src)}"></script>'
+    return f"<script>{get_plotlyjs()}</script>"
+
+
+def build_report(run: dict, traces: dict | None = None, *,
+                 plotly: Literal["inline", "external"] = "inline",
+                 plotly_src: str = "../" + PLOTLY_ASSET) -> str:
+    """Return the full HTML for a run. `traces` is the optional route-trace result.
+
+    `plotly="external"` references plotly.js at `plotly_src` instead of embedding the 4 MB
+    bundle; `PLOTLY_ASSET` is the path publish() writes the bundle to inside the site.
+    """
     s, a = run["snapshot"], run["analysis"]
     pub = s.get("public") or {}
     targets = a["targets"]
@@ -295,8 +330,8 @@ def build_report(run: dict, traces: dict | None = None) -> str:
     else:
         conn = "connection type unknown"
     meta = (f"{run['timestamp'][:19].replace('T', ' ')} UTC · {run['duration_s']:.0f} s run · {conn} · "
-            f"public {pub.get('ip')} ({html.escape(str(pub.get('isp')))}, {pub.get('city')}, "
-            f"{pub.get('country')})")
+            f"public {html.escape(str(pub.get('ip')))} ({html.escape(str(pub.get('isp')))}, "
+            f"{html.escape(str(pub.get('city')))}, {html.escape(str(pub.get('country')))})")
 
     tiles = [
         _tile("download", f"{speeds.get('download', {}).get('mbps', 0):.1f} <small>Mbit/s</small>",
@@ -315,7 +350,8 @@ def build_report(run: dict, traces: dict | None = None) -> str:
     ]
     thr = "".join(_div(_throughput(sp), f"s-{sp['direction']}") for sp in run["speed"]
                   if sp["samples_mbps"])
-    sections = "".join(_target_section(n, targets[n], run.get("phase_marks_s", {}), i)
+    sections = "".join(_target_section(n, targets[n], run.get("phase_marks_s", {}), i,
+                                       (traces or {}).get(n))
                        for i, n in enumerate(order))
     comparison = _div(_comparison(targets, order), "cmp")
     map_html = ""
@@ -328,7 +364,7 @@ def build_report(run: dict, traces: dict | None = None) -> str:
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>pingme — {html.escape(run['id'])}</title><style>{_css()}</style>
-<script>{get_plotlyjs()}</script></head><body><main>
+{_plotly_script(plotly, plotly_src)}</head><body><main>
 <h1>pingme — {html.escape(run['id'])}</h1><p class="meta">{meta}</p>
 <div class="tiles">{''.join(tiles)}</div>
 <section class="card"><h2>throughput</h2><div class="pair">{thr}</div></section>
@@ -345,7 +381,7 @@ through fibre along each candidate cable path (×1.3 for real cable routing).</p
 
 
 def write_report(run: dict, status=lambda msg: None, with_map: bool = True) -> str:
-    traces = trace_run(run, status) if with_map else None
+    traces = traces_for(run, status) if with_map else None
     reports = data_dir() / "reports"
     reports.mkdir(exist_ok=True)
     path = reports / f"{run['id']}.html"

@@ -374,41 +374,74 @@ files by hand.
   plotly from a CDN instead, which makes each report about 150 kB, so the
   repository stays small over hundreds of runs.
 
-## Design
+## Design (plan-gate order: data, then interfaces, then logic)
 
 Two repositories:
 
 | Repo | Visibility | Content |
 |---|---|---|
-| `internet-speed` | private or public, user's choice | this code |
-| `internet-speed-reports` | public | `index.html` + one redacted report per run |
+| `internet-speed` | user's choice | this code |
+| `internet-speed-reports` | public | `index.html`, `runs/index.json`, `runs/<id>.html` |
 
-Pages serves the second one at `https://filipejunqueira.github.io/internet-speed-reports/`.
-Deployment: the user asked for an Actions workflow so builds are visible.
-`.github/workflows/pages.yml` in the reports repo deploys the whole repo on every
-push to `main` (Pages source set to "GitHub Actions"). Verified 2026-08-29: the
-placeholder index shows at the site address. `pingme publish` still regenerates
-the index locally; the workflow only uploads.
+Pages serves the second one at `https://filipejunqueira.github.io/internet-speed-reports/`
+through `.github/workflows/pages.yml` on every push to `main` (live since 2026-08-29).
 
-New command `pingme publish [run]`:
+### 1. Data
 
-1. Build the report from the saved record with `include_plotlyjs="cdn"` and
-   **redaction on by default**: public IP → "redacted", SSID → "redacted",
-   origin marker on the map kept at city level. `--no-redact` exists but prints a
-   warning that the repo is public.
-2. Copy it to the reports checkout (`$XDG_DATA_HOME/pingme/site/`, a clone of
-   `internet-speed-reports`; cloned on first use), as `runs/<id>.html`.
-3. Regenerate `index.html`: a table of every report (label, date, ISP, down/up,
-   São Paulo p95, route verdict) newest first, linking to each page; same palette
-   and theme handling as the report. Data for the table comes from a small
-   `runs/index.json` the command also maintains, so the index never parses HTML.
-4. `git add`, commit "report <id>", push. Print the page URL.
-5. `pingme --publish` on a run does the same straight after measuring.
+`runs/index.json` — a JSON list, newest first, one object per published run:
 
-Data structures first: `index.json` is a list of `{id, label, timestamp, isp,
-city, medium, download_mbps, upload_mbps, worst_loss_pct, sao_paulo_p95_ms,
-sao_paulo_route}` — the same fields `pingme list` already shows, so both read
-one helper in `store.py`.
+```
+{"id": str, "label": str|null, "timestamp": str (ISO, UTC), "isp": str|null,
+ "city": str|null, "country": str|null, "medium": "wifi"|"ethernet"|null,
+ "download_mbps": float, "upload_mbps": float, "worst_loss_pct": float|null,
+ "local_overhead_ms": float, "sao_paulo_p95_ms": float|null,
+ "sao_paulo_route": str|null, "page": "runs/<id>.html"}
+```
+
+These are the fields `pingme list` shows today, so one helper feeds both. The
+private log `runs.jsonl` is never read by the site and never written by publish.
+
+Redaction, applied to a **deep copy** of the run record before any HTML is built:
+`snapshot.public.ip` → `"redacted"`, `snapshot.wifi.ssid` → `"redacted"`,
+`targets[*].samples` untouched, hop IPs untouched (they belong to Three/Valve, not
+to the user). The map's origin marker stays at the city-level coordinate ip-api
+gave; nothing finer exists in the record.
+
+### 2. Interfaces (signatures)
+
+- `store.summary_row(run: dict) -> dict` — the index.json object above. Replaces
+  the inline field-picking in `cli.list_runs`, which then calls it.
+- `render_web.redact(run: dict) -> dict` — returns the redacted deep copy.
+- `render_web.build_report(run, traces=None, *, plotly: Literal["inline", "cdn"] = "inline") -> str`
+  — new keyword; `"cdn"` emits
+  `<script src="https://cdn.plot.ly/plotly-7.0.0.min.js">` (version read from
+  `plotly.__version__`) instead of the 4 MB inline bundle.
+- `publish.site_dir() -> Path` — `$XDG_DATA_HOME/pingme/site`; clones
+  `git@github.com:filipejunqueira/internet-speed-reports.git` on first use.
+- `publish.build_index(rows: list[dict]) -> str` — index.html from index.json rows;
+  same CSS tokens as the report (imported from `render_web`, not copied).
+- `publish.publish(run: dict, *, status, redact: bool = True, with_map: bool = True) -> str`
+  — orchestrates: redact → trace (unless `with_map=False`) → build_report(cdn) →
+  write `runs/<id>.html` → update `runs/index.json` → write `index.html` →
+  `git add -A && git commit -m "report <id>" && git push` → return the page URL.
+- CLI: `pingme publish [run] [--no-redact] [--no-map]`; `pingme --publish` on a run.
+  `--no-redact` prints a one-line warning naming the public repo before it runs.
+
+### 3. Logic notes
+
+- The git steps use `subprocess.run([...], cwd=site_dir(), check=True)`; a
+  non-zero exit stops publish with the git message shown. No force pushes.
+- If `index.json` is missing (first publish), start from an empty list.
+- Re-publishing the same id replaces its page and its row (no duplicates).
+
+### Invariants (tests)
+
+- Publishing never changes `runs.jsonl`: test compares the file's bytes before and
+  after `publish()` with git calls stubbed.
+- The redacted HTML never contains `snapshot.public.ip` or `snapshot.wifi.ssid`
+  from the input record; the unredacted HTML contains both.
+- `index.json` ids are unique after two publishes of the same run.
+- The CDN report is under 300 kB for the fixture run.
 
 ## Steps and who does them
 
@@ -422,33 +455,71 @@ Subagents where the work is independent and self-contained:
    needs one commit before Pages activates; step 4 supplies it.
 2. [x] **Main session:** push this code to `internet-speed` (`git remote add origin
    git@github.com:filipejunqueira/internet-speed.git && git push -u origin master`).
-3. **Subagent A (general-purpose, code):** implement `render_web.build_report(...,
-   redact=True, plotly="cdn")`, the `index.json` helper in `store.py`, the
-   `index.html` generator, and `pingme publish` / `--publish` in `cli.py`, with
-   tests: redaction removes the IP and SSID strings; the index lists every run in
-   `index.json`; the published file is under 300 kB. Runs in parallel with step 1.
-4. **Main session:** first `pingme publish` of the smoke run; open the URL on the
+3. [x] 2026-08-30 — done by a subagent: `store.summary_row`, `render_web.redact`,
+   `build_report(plotly=)`, `publish.py`, CLI, 5 tests (19 passed). Deviation:
+   `pingme list` lost its "london p95" column (index.json has no London field).
+   Discovery: the trace ran at publish time, so a re-publish of an old run would
+   draw today's network. Fix made in the main session: `pingme --web/--publish`
+   trace at run time and save `traces` in the record; `web`/`publish`/`map` on a
+   saved run reuse them, else trace now with a warning. Constants moved to
+   `places.py` to break the run↔render_map import cycle. The report and the
+   terminal now print the traced city path per target ("traced path: you →
+   London → Amsterdam → Madrid → São Paulo") above the timing estimate.
+   **Subagent A (general-purpose, code):** implement the interfaces in "Design"
+   §2 in `store.py`, `render_web.py`, new `publish.py`, `cli.py`, with the
+   invariant tests above in `tests/test_publish.py`. ~30 min.
+4. [x] 2026-08-30 — the smoke run's log had been cleaned from the scratchpad, so
+   the first publish was a fresh quick run on the BT line:
+   `pingme --quick --label leeds_bt --publish` → page live at
+   `runs/leeds_bt_2026-08-30T13-59-15Z.html`, 76 kB, 0 occurrences of the IP or
+   SSID, 2 "redacted" marks; site index HTTP 200. Hops visible on BT: London
+   8 hops/1 hidden, US-East 12/3, São Paulo 15/2, Madrid 11/2. The São Paulo
+   trace goes London → Amsterdam → Madrid → São Paulo, while the timing estimate
+   says "via USA": the physics floors are too coarse to tell a Madrid-side cable
+   from a US route at ~190 ms, so the traced path now outranks the estimate in
+   the report. One hop geolocated to "Saint Petersburg" by RIPE IPmap on a
+   Telefónica address is doubtful; sources are shown next to each hop.
+   **Main session:** first `pingme publish` of the smoke run; open the URL on the
    phone.
-5. **Subagent B (code-review at medium effort):** review the diff of step 3 for
+5. [x] 2026-08-30 — code review (medium) returned 8 findings; all fixed except the
+   deliberate hop-IP decision (§1 Data). Fixed: cdn.plot.ly does not serve
+   plotly-7.0.0 (HTTP 403 — the first published page had no charts), so the site
+   now hosts `assets/plotly-<version>.min.js` written once by publish and pages
+   reference it; a run with `--web/--publish` is saved before the trace can be
+   interrupted; publish does `git pull --rebase` first and commits only when
+   something changed (a second publish of the same run no longer crashes); city
+   and country are HTML-escaped; the private first hop no longer appears as a
+   "local network" city; one `traced_path` helper serves both renderers;
+   CLAUDE.md lists `publish`.
+   **Subagent B (code-review at medium effort):** review the diff of step 3 for
    leaks in the redaction path (anything from `snapshot` that reaches the HTML).
-6. **verify-project agent:** lint, tests, sanity checks; then commit and push.
+6. [x] 2026-08-30 — verify-project: ruff clean, 20 passed, imports clean, both
+   help commands exit 0. Committed and pushed (see git log).
+   **verify-project agent:** lint, tests, sanity checks; then commit and push.
 
 Steps 1 and 3 run at the same time; 2 needs 1's first repo; 4 needs 1 and 3;
 5 and 6 follow 4.
 
 ## Success criteria
 
-- Opening `https://filipejunqueira.github.io/internet-speed-reports/` on the phone
-  shows the index with the smoke run; tapping it opens the full report with charts
-  and the map.
-- `grep -c "188.28" runs/<id>.html` is 0 and the SSID string is absent in the
-  published file (redaction check); the same report built with `--no-redact`
-  contains both (so redaction is a real switch, not a broken feature).
-- Published report file under 300 kB.
-- `uv run pytest` green including the three new tests; `uv run ruff check .` clean.
-- Invariant: the private log in `runs.jsonl` is never modified by publishing.
+- [x] Opening `https://filipejunqueira.github.io/internet-speed-reports/` on the phone
+  shows the index with the `leeds_bt` run (user saw the placeholder; the charts
+  need the plotly asset deploy — checked with curl below).
+- [x] 0 occurrences of the IP `86.170.56.246` and the SSID `BT-FMAGNK` in the
+  published file; the unredacted/redacted pair is a unit test.
+- [x] Published report file 76 kB.
+- [x] `uv run pytest` 20 passed; `uv run ruff check .` clean.
+- [x] Invariant test: `runs.jsonl` bytes unchanged across `publish()`.
+
+## Risks and rollback
+
+- A leak in redaction publishes personal data to a public repo. Mitigation: the
+  invariant test plus the code-review agent on the redaction path before the first
+  real publish. Rollback: `git rm` the page in the reports repo, push; note that
+  GitHub keeps history, so a leaked page needs a history rewrite (user's call).
+- The reports repo grows by ~150 kB per run; 1,000 runs is ~150 MB, acceptable.
 
 ## Out of scope
 
-Password-protecting the site (Pages cannot), a custom domain, an Actions build,
-automatic publishing on a schedule.
+Password-protecting the site (Pages cannot), a custom domain, automatic publishing
+on a schedule, publishing the raw per-probe samples as data files.

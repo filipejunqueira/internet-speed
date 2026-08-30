@@ -52,7 +52,7 @@ def _timeline(entry: dict, width: int, height: int) -> Text:
     return _plot_to_text(width, height, draw)
 
 
-def _target_panel(name: str, entry: dict, width: int) -> Panel:
+def _target_panel(name: str, entry: dict, width: int, trace_entry: dict | None = None) -> Panel:
     a, idle, busy = entry["all"], entry["idle"], entry["busy"]
     head = (f"[bold]{name}[/bold]  {entry['ip']}   "
             f"loss [bold]{_fmt(a['loss_pct'], '%')}[/bold]  "
@@ -65,9 +65,15 @@ def _target_panel(name: str, entry: dict, width: int) -> Panel:
     route = entry.get("route") or {}
     if route.get("dev"):
         head += f"\nroute: {route['dev']}"
+    if trace_entry:
+        from .render_map import traced_path
+
+        path = traced_path(trace_entry)
+        if path:
+            head += f"\ntraced path: [bold]{path}[/bold]"
     if entry.get("physics"):
         p = entry["physics"]
-        head += (f"   physics: ~{_fmt(p['effective_ms'], '', 0)} ms after local overhead → "
+        head += (f"   timing estimate: ~{_fmt(p['effective_ms'], '', 0)} ms after local overhead → "
                  f"[bold]{p['most_consistent'] or 'faster than any known route?'}[/bold]")
     if entry.get("error") and not entry["samples"]:
         return Panel(Text(f"{name}  {entry['ip']}  — {entry['error']}", style="red"),
@@ -145,7 +151,8 @@ def render(run: dict, console: Console | None = None) -> None:
     console.print(_header(run))
     targets = run["analysis"]["targets"]
     for name in sorted(targets, key=lambda n: TARGET_ORDER.index(n) if n in TARGET_ORDER else 99):
-        console.print(_target_panel(name, targets[name], width))
+        trace_entry = (run.get("traces") or {}).get(name)
+        console.print(_target_panel(name, targets[name], width, trace_entry))
     console.print(_speed_panel(run, width))
     console.print(_verdict_table(run))
     console.print(f"saved to {run.get('saved_to', '?')}", style="dim")

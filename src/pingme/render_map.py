@@ -9,7 +9,7 @@ import httpx
 import plotly.graph_objects as go
 
 from .geo import Location, locate
-from .run import FORTALEZA, MIAMI, NEW_YORK, SINES
+from .places import FORTALEZA, MIAMI, NEW_YORK, SINES
 from .store import data_dir
 from .trace import trace
 
@@ -42,6 +42,27 @@ def trace_run(run: dict, status=lambda msg: None) -> dict:
             out[t["name"]] = {"error": err, "hops": [h.as_dict() for h in hops],
                               "locations": [loc.as_dict() if loc else None for loc in located]}
     return out
+
+
+def path_cities(trace_entry: dict) -> list[str]:
+    """Placed hop cities in order, consecutive repeats collapsed, hidden runs as '…'."""
+    out: list[str] = []
+    for loc in trace_entry.get("locations") or []:
+        if loc is not None and loc.get("source") == "private":
+            continue  # your own router, drawn as the origin already
+        city = None if loc is None or loc.get("lat") is None else (loc.get("city") or "?")
+        token = "…" if city is None else city
+        if not out or out[-1] != token:
+            out.append(token)
+    return out
+
+
+def traced_path(trace_entry: dict) -> str | None:
+    """'you → London → … → São Paulo' when at least two hops were placed, else None."""
+    cities = path_cities(trace_entry)
+    if len([c for c in cities if c != "…"]) < 2:
+        return None
+    return "you → " + " → ".join(cities)
 
 
 def _segments(origin: tuple[float, float], target: dict, locs: list[Location | None]):
@@ -115,9 +136,18 @@ def map_figure(run: dict, traces: dict) -> go.Figure:
     return fig
 
 
+def traces_for(run: dict, status=lambda msg: None) -> dict:
+    """Traces saved with the run; otherwise trace now and say so."""
+    if run.get("traces"):
+        return run["traces"]
+    status("[yellow]no route trace saved with this run; "
+           "tracing now, on the current network[/yellow]")
+    return trace_run(run, status)
+
+
 def build_map(run: dict, status=lambda msg: None) -> str:
-    """Trace, draw and open the map-only page."""
-    traces = trace_run(run, status)
+    """Draw and open the map-only page."""
+    traces = traces_for(run, status)
     fig = map_figure(run, traces)
     maps = data_dir() / "maps"
     maps.mkdir(exist_ok=True)

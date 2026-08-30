@@ -45,6 +45,8 @@ def wifi_details(dev: str) -> dict | None:
                 d["generation"] = "Wi-Fi 6"
             elif "VHT" in rest:
                 d["generation"] = "Wi-Fi 5"
+            elif "MCS" in rest:  # plain "MCS n" with no HE/VHT prefix is 802.11n
+                d["generation"] = "Wi-Fi 4"
     m = re.search(r"channel\s+(\d+)\s+\((\d+) MHz\),\s*width:\s*(\d+) MHz", info)
     if m:
         d["channel"] = int(m.group(1))

@@ -59,3 +59,28 @@ def find_run(ref: str | None) -> dict | None:
     if len(prefixed) == 1:
         return prefixed[0]
     return None
+
+
+def summary_row(run: dict) -> dict:
+    """The one-line summary of a run: what `pingme list` shows and what the site index stores."""
+    s = run["snapshot"]
+    pub = s.get("public") or {}
+    speed = {x["direction"]: x["mbps"] for x in run["speed"]}
+    targets = run["analysis"]["targets"]
+    sp = targets.get("sao-paulo") or {}
+    return {
+        "id": run["id"],
+        "label": run.get("label"),
+        "timestamp": run["timestamp"],
+        "isp": pub.get("isp"),
+        "city": pub.get("city"),
+        "country": pub.get("country"),
+        "medium": s.get("medium"),
+        "download_mbps": speed.get("download", 0.0),
+        "upload_mbps": speed.get("upload", 0.0),
+        "worst_loss_pct": max((t["all"]["loss_pct"] for t in targets.values()), default=None),
+        "local_overhead_ms": run["analysis"]["local_overhead_ms"],
+        "sao_paulo_p95_ms": (sp.get("all") or {}).get("p95_ms"),
+        "sao_paulo_route": (sp.get("physics") or {}).get("most_consistent"),
+        "page": f"runs/{run['id']}.html",
+    }

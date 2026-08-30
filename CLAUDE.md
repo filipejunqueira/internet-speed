@@ -15,7 +15,11 @@ Design and evidence: `PLAN.md`; direction: `TODO.md`.
 - run (60 s): `uv run pingme --label <name>`; `--quick` 30 s, `--long` 2 min, `--longer` 10 min
 - run + web report: `uv run pingme --label <name> --web`
 - read the log back: `uv run pingme list`, `uv run pingme show [id]`, `uv run pingme compare A B`
-- web report for a saved run: `uv run pingme web [id]` (`--no-map` skips the ~2 min trace)
+- web report for a saved run: `uv run pingme web [id]` (`--no-map` skips the map; runs made
+  with `--web`/`--publish` carry their trace, older ones are traced now)
+- publish to GitHub Pages: `uv run pingme --label <name> --publish`, or `uv run pingme publish [id]`
+  (redacts IP and SSID by default; `--no-redact` to keep them; `--no-map` skips the map).
+  Site: https://filipejunqueira.github.io/internet-speed-reports/
 - test all: `uv run pytest`; test one: `uv run pytest -k <name>`
 - lint: `uv run ruff check .`
 - put `pingme` on PATH (user's own terminal, not the container): `uv tool install --editable .`
