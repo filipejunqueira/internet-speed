@@ -10,18 +10,12 @@ import time
 from dataclasses import dataclass
 
 from . import speed
+from .places import FORTALEZA, LONDON, MIAMI, NEW_YORK, SINES
 from .probe import Phase, ProbeResult, probe_all
 from .snapshot import route_for, take_snapshot
 from .stats import RouteCandidate, physics_verdict, summarise
 from .store import append_run
 from .targets import Target, fetch_sdr, local_targets, parse_sdr
-
-# Cable landing points used by the physics check (lat, lon).
-SINES = (37.95, -8.87)
-FORTALEZA = (-3.73, -38.52)
-NEW_YORK = (40.71, -74.0)
-MIAMI = (25.77, -80.19)
-LONDON = (51.51, -0.13)
 
 ROUTE_CANDIDATES: dict[str, list[RouteCandidate]] = {
     "sao-paulo": [
@@ -165,7 +159,13 @@ def analyse(results: list[ProbeResult], targets: list[Target], snapshot: dict) -
             "origin": list(origin), "targets": per_target}
 
 
-def run(label: str | None, timing: Timing, status=lambda msg: None) -> dict:
+def run(label: str | None, timing: Timing, status=lambda msg: None,
+        trace: bool = False) -> dict:
+    """Measure, analyse, optionally trace the routes, then append to the log.
+
+    Tracing at run time keeps the map honest: a report built later from the saved
+    record shows the network the run was measured on, not today's.
+    """
     when = dt.datetime.now(dt.UTC)
     status("reading connection details …")
     snapshot = take_snapshot()
@@ -189,5 +189,13 @@ def run(label: str | None, timing: Timing, status=lambda msg: None) -> dict:
         "speed": [s.as_dict() for s in speeds],
         "analysis": analysis,
     }
+    if trace:
+        from .render_map import trace_run
+
+        try:
+            record["traces"] = trace_run(record, status)
+        except BaseException:  # Ctrl-C or a trace failure must not lose the measurement
+            record["saved_to"] = str(append_run(record))
+            raise
     record["saved_to"] = str(append_run(record))
     return record
