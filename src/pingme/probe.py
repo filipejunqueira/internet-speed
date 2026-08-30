@@ -94,10 +94,14 @@ async def _ping_one(target: str, ip: str, duration: float, phase: Phase,
                 await asyncio.wait_for(proc.wait(), timeout=3)
             except TimeoutError:
                 proc.kill()
-    # sent = probes issued over the whole window, not just the ones answered
-    result.sent = max(result.sent, int(duration / INTERVAL_S))
-    if not result.samples and result.error is None:
-        result.error = "no replies"
+    # Count what was really sent, from the highest sequence number that came back.
+    # An estimate from the clock (duration / INTERVAL_S) overshoots by one probe or
+    # more, which invents packet loss on a perfect line. With nothing back at all
+    # there is no sequence to read, so the clock estimate is the only option.
+    if not result.samples:
+        result.sent = int(duration / INTERVAL_S)
+        if result.error is None:
+            result.error = "no replies"
 
 
 async def probe_all(targets: list[tuple[str, str]], duration: float, phase: Phase,
