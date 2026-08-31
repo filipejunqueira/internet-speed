@@ -1,15 +1,21 @@
 # TODO — internet-speed
 
+Last updated: 2026-08-31
+
 ## Now
 
-- [ ] Open https://filipejunqueira.github.io/internet-speed-reports/ on the phone; review the report design there
-- [ ] Full 60 s run into the real log from the user's terminal: `uv run pingme --label airbnb_leeds --web`
+- [ ] Decide: label a silent `isp-hop` "does not answer probes" instead of "100 % loss"
+      (on BT that router never replies, so a working line reads as a broken one)
+- [ ] Decide: add burst loss — the longest run of consecutive lost probes per target,
+      marked on the timeline. Bursts are what a Dota match actually feels; a percentage
+      treats ten losses together and ten spread out as the same
 
 ## Next
 
-- [ ] `uv tool install --editable .` so `pingme` is on PATH
-- [ ] Compare the Leeds Airbnb run against the next connection with `pingme compare`
+- [ ] Run `pingme --label <place> --publish` on the next connection, then `pingme compare`
+      against `leeds_bt_2026-08-30T15-32-20Z`
 - [ ] Confirm which relay Dota actually uses in a match: `ss -unp | grep -i dota` during a game
+- [ ] Probe over UDP to the relay's game ports, so loss matches what the game sees
 
 ## Later
 
@@ -24,6 +30,8 @@
 
 ## Done
 
+- 2026-08-31 — Packet loss counted from probe sequence numbers. The clock estimate invented ~0.3 % loss on every target; the BT line really lost 1 packet in 1,495.
+- 2026-08-30 — `pingme` installed on PATH; first full 60 s run published from the user's terminal: https://filipejunqueira.github.io/internet-speed-reports/runs/leeds_bt_2026-08-30T15-32-20Z.html
 - 2026-08-30 — Phase 2 done: `pingme publish` / `--publish` to GitHub Pages with redaction, self-hosted plotly.js, run-time traces saved in the record, traced city path in reports. Review findings fixed.
 
 - 2026-08-29 — Remote Control running; GitHub repos `internet-speed` (code) and `internet-speed-reports` (Pages via Actions) live with placeholder index.
