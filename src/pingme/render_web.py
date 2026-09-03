@@ -18,7 +18,7 @@ from plotly import __version__ as PLOTLY_VERSION
 from plotly.offline import get_plotlyjs
 
 from .probe import INTERVAL_S
-from .render_map import map_figure, traced_path, traces_for
+from .render_map import TRACE_QUERIES, hop_rows, map_figure, traced_path, traces_for
 from .store import burst_probes, data_dir, is_silent
 
 TARGET_ORDER = ["router", "isp-hop", "london", "madrid", "us-east", "sao-paulo"]
@@ -215,6 +215,31 @@ def _stats_table(entry: dict) -> str:
             f"</tr></thead><tbody>{rows}</tbody></table></details>")
 
 
+def _route_table(trace_entry: dict) -> str:
+    """Every hop to this target, with the delay each one adds on top of the last."""
+    rows = hop_rows(trace_entry)
+    if not rows:
+        return ""
+    body = ""
+    for r in rows:
+        if r["ip"] is None:
+            body += ('<tr class="quiet"><th>{n}</th><td colspan="5">no reply</td></tr>'
+                     .format(n=r["n"]))
+            continue
+        where = "—" if not r["place"] else f'{r["place"]} <small>({r["source"]})</small>'
+        note = "" if not r["no_reply"] else (
+            f' <small class="quiet">{r["no_reply"]} of {TRACE_QUERIES} probes unanswered'
+            "</small>")
+        body += (f'<tr><th>{r["n"]}</th><td>{html.escape(r["ip"])}</td>'
+                 f'<td><small>{html.escape(r["hostname"] or "")}</small></td>'
+                 f"<td>{where}</td><td>{_fmt(r['ms'])}{note}</td>"
+                 f"<td>{'' if r['step_ms'] is None else format(r['step_ms'], '+.1f')}</td></tr>")
+    return ('<details><summary>every hop, and where the time goes</summary>'
+            '<table class="stats hops"><thead><tr><th>#</th><th>address</th><th>name</th>'
+            "<th>placed</th><th>reached in, ms</th><th>added, ms</th></tr></thead>"
+            f"<tbody>{body}</tbody></table></details>")
+
+
 def _target_section(name: str, entry: dict, marks: dict, i: int,
                     trace_entry: dict | None = None) -> str:
     a = entry["all"]
@@ -258,7 +283,8 @@ def _target_section(name: str, entry: dict, marks: dict, i: int,
         body = f'<p class="error">{html.escape(entry["error"])}</p>'
     else:
         body = (f'<div class="pair">{_div(_hist(entry), f"h{i}")}{_div(_timeline(entry, marks), f"t{i}")}'
-                f"</div>{_stats_table(entry)}")
+                f"</div>{_stats_table(entry)}"
+                f"{_route_table(trace_entry) if trace_entry else ''}")
     badge = ("" if silent else
              f'<span class="badge {loss_status[0]}">{loss_status[1]} loss</span>')
     return (f'<section class="card" id="target-{name}"><h2>{name} '
@@ -297,6 +323,8 @@ h1{{font-size:20px;margin:0 0 2px}} h2{{font-size:15px;margin:0 0 6px}} h3{{font
 details{{margin:4px 0 0}} summary{{cursor:pointer;color:var(--muted);font-size:12px}}
 table.stats{{border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:12px;margin-top:6px;width:100%}}
 table.stats th,table.stats td{{text-align:right;padding:3px 8px;border-bottom:1px solid var(--grid)}} table.stats th:first-child{{text-align:left}}
+table.hops td:nth-child(2),table.hops td:nth-child(3),table.hops td:nth-child(4){{text-align:left}}
+table.hops tr.quiet td{{text-align:left;color:var(--muted)}} table.hops small{{color:var(--muted)}}
 .error{{color:{STATUS['critical']}}} .quiet{{color:var(--muted)}}
 .foot{{color:var(--muted);font-size:12px;margin-top:20px}}
 .plotly-graph-div{{width:100%}}
@@ -445,7 +473,11 @@ pingme's own thresholds: any lost probe at all is flagged, loss ≥{LOSS_WARN:g}
 penalty ≥{PENALTY_WARN:g} ms warning, ≥{PENALTY_CRIT:g} ms critical. An address that never
 answers is reported as silent rather than as total loss.
 Route verdicts compare the best round trip, minus local overhead, with the time light needs
-through fibre along each candidate cable path (×1.3 for real cable routing).</p>
+through fibre along each candidate cable path (×1.3 for real cable routing). Each hop in
+"every hop" was measured {TRACE_QUERIES} times by traceroute, so its delay wobbles and an
+"added" figure can come out negative; that is noise, not a router giving time back. Routers
+often answer traceroute slowly or not at all on purpose, so an unanswered probe there says
+nothing about the traffic passing through.</p>
 </main><script>{_theme_js()}</script></body></html>"""
 
 

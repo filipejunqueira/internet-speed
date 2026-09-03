@@ -36,3 +36,42 @@ def test_path_cities_collapses_repeats_and_marks_hidden_runs():
         {"city": None, "lat": None, "lon": None},
         {"city": "São Paulo", "lat": -23.5, "lon": -46.6}]}
     assert path_cities(entry) == ["London", "…", "Madrid", "…", "São Paulo"]
+
+
+def test_hop_rows_say_what_each_hop_adds_over_the_last_one_that_answered():
+    from pingme.render_map import hop_rows
+
+    entry = {
+        "hops": [
+            {"n": 1, "ip": "192.168.1.1", "avg_ms": 1.0, "loss_pct": 0.0},
+            {"n": 2, "ip": None, "avg_ms": None, "loss_pct": None},
+            {"n": 3, "ip": "10.0.0.1", "avg_ms": 9.0, "loss_pct": 66.7},
+            {"n": 4, "ip": "1.2.3.4", "avg_ms": 48.0, "loss_pct": 0.0},
+        ],
+        "locations": [
+            {"ip": "192.168.1.1", "lat": None, "lon": None, "city": None,
+             "source": "private", "hostname": None},
+            None,
+            {"ip": "10.0.0.1", "lat": 51.5, "lon": -0.1, "city": "London",
+             "source": "ripe-ipmap", "hostname": "core.example.net"},
+            {"ip": "1.2.3.4", "lat": 40.4, "lon": -3.7, "city": "Madrid",
+             "source": "ip-api", "hostname": None},
+        ],
+    }
+    rows = hop_rows(entry)
+    assert [r["n"] for r in rows] == [1, 2, 3, 4]
+    assert rows[0]["step_ms"] is None  # nothing before it to add to
+    assert rows[1]["ip"] is None and rows[1]["ms"] is None
+    assert rows[2]["step_ms"] == 8.0  # 9.0 over the 1.0 of hop 1, skipping the silent hop
+    assert rows[2]["place"] == "London" and rows[2]["hostname"] == "core.example.net"
+    assert rows[2]["no_reply"] == 2  # two of the three traceroute probes went unanswered
+    assert rows[3]["step_ms"] == 39.0  # the ocean, or in this case the Pyrenees
+    assert rows[0]["place"] is None  # a private address is not placed on the map
+
+
+def test_hop_rows_survive_a_trace_that_recorded_no_locations():
+    from pingme.render_map import hop_rows
+
+    rows = hop_rows({"hops": [{"n": 1, "ip": "1.1.1.1", "avg_ms": 2.0, "loss_pct": 0.0}]})
+    assert rows[0]["place"] is None and rows[0]["ms"] == 2.0
+    assert hop_rows({}) == []

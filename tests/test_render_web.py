@@ -87,3 +87,20 @@ def test_an_old_records_silent_hop_no_longer_wins_worst_loss():
     assert "100.0%" not in tile
     assert summary_row(run)["worst_loss_pct"] != 100.0
     assert summary_row(run)["worst_burst_probes"] is None
+
+
+def test_the_report_shows_every_hop_and_what_it_adds():
+    run = json.loads(FIXTURE.read_text())
+    traces = {"london": {"error": None,
+                         "hops": [{"n": 1, "ip": "192.168.1.1", "avg_ms": 1.0, "loss_pct": 0.0},
+                                  {"n": 2, "ip": None, "avg_ms": None, "loss_pct": None},
+                                  {"n": 3, "ip": "1.2.3.4", "avg_ms": 12.0, "loss_pct": 0.0}],
+                         "locations": [None, None,
+                                       {"ip": "1.2.3.4", "lat": 51.5, "lon": -0.1,
+                                        "city": "London", "source": "ip-api",
+                                        "hostname": "edge.example.net"}]}}
+    html = build_report(run, traces)
+    assert "every hop, and where the time goes" in html
+    assert "edge.example.net" in html
+    assert "+11.0" in html  # 12.0 ms at hop 3, on top of the 1.0 ms at hop 1
+    assert "no reply" in html  # hop 2 keeps its place in the numbering

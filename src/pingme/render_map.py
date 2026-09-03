@@ -65,8 +65,51 @@ def traced_path(trace_entry: dict) -> str | None:
     return "you → " + " → ".join(cities)
 
 
-def _segments(origin: tuple[float, float], target: dict, locs: list[Location | None]):
+TRACE_QUERIES = 3  # traceroute -q 3: how many probes each hop gets
+
+
+def hop_rows(trace_entry: dict) -> list[dict]:
+    """One row per hop: where it is, how long it took, and what it added over the last one.
+
+    `step_ms` is the delay this hop added on top of the previous hop that answered. It is
+    what tells you which link the time goes into. Each figure is a single measurement, so
+    it wobbles, and a negative step means noise rather than a router giving time back.
+    """
+    rows: list[dict] = []
+    previous_ms = None
+    hops = trace_entry.get("hops") or []
+    locs = trace_entry.get("locations") or []
+    for i, hop in enumerate(hops):
+        loc = locs[i] if i < len(locs) else None
+        ms = hop.get("avg_ms")
+        step = None if ms is None or previous_ms is None else round(ms - previous_ms, 1)
+        placed = bool(loc) and loc.get("lat") is not None
+        missing = hop.get("loss_pct")
+        rows.append({
+            "n": hop["n"],
+            "ip": hop.get("ip"),
+            "hostname": (loc or {}).get("hostname"),
+            "place": (loc.get("city") or "?") if placed else None,
+            "source": (loc or {}).get("source") if placed else None,
+            "ms": ms,
+            "step_ms": step,
+            "no_reply": None if missing is None else round(TRACE_QUERIES * missing / 100),
+        })
+        if ms is not None:
+            previous_ms = ms
+    return rows
+
+
+def _hop_ms(trace_entry: dict) -> dict[str, float]:
+    """Delay per hop address, so the map can say how long each point took to reach."""
+    return {h["ip"]: h["avg_ms"] for h in (trace_entry.get("hops") or [])
+            if h.get("ip") and h.get("avg_ms") is not None}
+
+
+def _segments(origin: tuple[float, float], target: dict, locs: list[Location | None],
+              hop_ms: dict[str, float] | None = None):
     """Turn the hop list into (lat, lon, label, hidden_before) points to draw."""
+    hop_ms = hop_ms or {}
     pts = [(origin[0], origin[1], "you", 0)]
     hidden = 0
     for loc in locs:
@@ -75,7 +118,9 @@ def _segments(origin: tuple[float, float], target: dict, locs: list[Location | N
             continue
         if abs(loc.lat - pts[-1][0]) < 0.05 and abs(loc.lon - pts[-1][1]) < 0.05:
             continue  # same place as the previous point, do not draw a zero-length hop
-        label = f"{loc.city or '?'} ({loc.ip}, {loc.source})"
+        ms = hop_ms.get(loc.ip)
+        reached = "" if ms is None else f", {ms:.0f} ms in"
+        label = f"{loc.city or '?'} ({loc.ip}, {loc.source}{reached})"
         pts.append((loc.lat, loc.lon, label, hidden))
         hidden = 0
     if target["lat"] is not None:
@@ -92,7 +137,7 @@ def map_figure(run: dict, traces: dict) -> go.Figure:
     fig = go.Figure()
     for name, tr in traces.items():
         locs = [Location(**loc) if loc else None for loc in tr["locations"]]
-        pts = _segments(origin, run_targets[name], locs)
+        pts = _segments(origin, run_targets[name], locs, _hop_ms(tr))
         colour = COLOURS.get(name, "#333")
         physics = (run["analysis"]["targets"].get(name) or {}).get("physics") or {}
         verdict = physics.get("most_consistent") or "no verdict"
