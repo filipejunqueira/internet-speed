@@ -4,11 +4,7 @@ Last updated: 2026-09-03
 
 ## Now
 
-- [ ] Loss you can trust → PLAN.md (steps 1–6). Decided 2026-09-03: a target with zero
-      replies is "silent", not 100 % loss; add burst loss (longest run of consecutive
-      lost probes, marked on the timeline). Same change fixes two defects the review
-      found: idle-phase loss reads ~34 % in every saved run (the idle span covers the
-      busy probes), and loss after the last reply is never counted.
+- [ ] Nothing. Pick the next item from Next.
 
 ## Next
 
@@ -40,6 +36,14 @@ Last updated: 2026-09-03
 
 ## Done
 
+- 2026-09-03 — Loss you can trust. ping now sends an exact number of probes and waits
+  for the last replies, so nothing is invented and nothing at the end is missed; the
+  wrong flag pair had it reporting 0.7 % loss to São Paulo on a clean line. Per-phase
+  loss was wrong in every saved run (idle read ~34 %) because the idle span covered
+  the busy probes; each probe now belongs to exactly one phase. A target that never
+  answers reads as silent instead of 100 % loss. Every target reports its longest
+  burst of consecutive losses, drawn on both timelines. Any lost probe at all now
+  fails the green badge. 13 tests added, 35 in total.
 - 2026-08-31 — Packet loss counted from probe sequence numbers. The clock estimate invented ~0.3 % loss on every target; the BT line really lost 1 packet in 1,495.
 - 2026-08-30 — `pingme` installed on PATH; first full 60 s run published from the user's terminal: https://filipejunqueira.github.io/internet-speed-reports/runs/leeds_bt_2026-08-30T15-32-20Z.html
 - 2026-08-30 — Phase 2 done: `pingme publish` / `--publish` to GitHub Pages with redaction, self-hosted plotly.js, run-time traces saved in the record, traced city path in reports. Review findings fixed.
