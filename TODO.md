@@ -4,7 +4,10 @@ Last updated: 2026-09-03
 
 ## Now
 
-- [ ] Nothing. Pick the next item from Next.
+- [ ] Run explorer on GitHub Pages → PLAN.md (draft, awaiting approval 2026-09-03):
+      one page listing every published run; tick one to read it, two or three to compare
+      with one colour per run, map included. Mockup:
+      https://claude.ai/code/artifact/fe5fdc5f-b0ca-44ba-a503-9f36f3822dec
 
 ## Next
 
