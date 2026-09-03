@@ -1,14 +1,14 @@
 # TODO — internet-speed
 
-Last updated: 2026-08-31
+Last updated: 2026-09-03
 
 ## Now
 
-- [ ] Decide: label a silent `isp-hop` "does not answer probes" instead of "100 % loss"
-      (on BT that router never replies, so a working line reads as a broken one)
-- [ ] Decide: add burst loss — the longest run of consecutive lost probes per target,
-      marked on the timeline. Bursts are what a Dota match actually feels; a percentage
-      treats ten losses together and ten spread out as the same
+- [ ] Loss you can trust → PLAN.md (steps 1–6). Decided 2026-09-03: a target with zero
+      replies is "silent", not 100 % loss; add burst loss (longest run of consecutive
+      lost probes, marked on the timeline). Same change fixes two defects the review
+      found: idle-phase loss reads ~34 % in every saved run (the idle span covers the
+      busy probes), and loss after the last reply is never counted.
 
 ## Next
 
@@ -22,6 +22,13 @@ Last updated: 2026-08-31
 - [ ] Physics route floors are too coarse near 190 ms (Madrid-side cable vs via USA); add candidate cables landing in Spain/Portugal, or drop the estimate when hops are visible
 - [ ] Doubtful hop geolocation (RIPE IPmap put a Telefónica router in Saint Petersburg); show a confidence or prefer hostname codes
 
+- [ ] `pingme reanalyse [id]`: every record stores its samples, so old runs can be
+      recomputed with the fixed loss accounting and appended as a new record
+- [ ] Upload speed over-counts: `speed._upload` counts a block when it enters httpx's
+      buffer, not when it leaves the machine. Three streams × 64 KB at the deadline is
+      ~8 % on a 2 Mbit/s uplink over 10 s, noise on a fast line
+- [ ] Decide: `.gitignore` ignores `notes/snapshots/` but the snapshot skill treats
+      snapshots as tracked history. Pick a side
 - [ ] Live refreshing display (htop-style) instead of run-draw-exit
 - [ ] IPv6 traces (Three shows its IPv6 hops; the relays are IPv4 only)
 - [ ] Read the Three router's 5G signal from its admin page
