@@ -17,6 +17,7 @@ import plotly.graph_objects as go
 from plotly import __version__ as PLOTLY_VERSION
 from plotly.offline import get_plotlyjs
 
+from .probe import INTERVAL_S
 from .render_map import map_figure, traced_path, traces_for
 from .store import data_dir
 
@@ -24,11 +25,11 @@ TARGET_ORDER = ["router", "isp-hop", "london", "madrid", "us-east", "sao-paulo"]
 
 # Light-mode hexes; JS swaps to the dark step of the same hue when the page is dark.
 LIGHT = {"idle": "#2a78d6", "download": "#eb6834", "upload": "#1baf7a", "busy": "#eb6834",
-         "bar": "#2a78d6", "range": "#86b6ef", "muted": "#898781",
+         "bar": "#2a78d6", "range": "#86b6ef", "muted": "#898781", "lost": "#d03b3b",
          "london": "#2a78d6", "madrid": "#eb6834", "us-east": "#1baf7a", "sao-paulo": "#eda100",
          "router": "#898781", "isp-hop": "#898781"}
 DARK = {"idle": "#3987e5", "download": "#d95926", "upload": "#199e70", "busy": "#d95926",
-        "bar": "#3987e5", "range": "#1c5cab", "muted": "#898781",
+        "bar": "#3987e5", "range": "#1c5cab", "muted": "#898781", "lost": "#e05252",
         "london": "#3987e5", "madrid": "#d95926", "us-east": "#199e70", "sao-paulo": "#c98500",
         "router": "#898781", "isp-hop": "#898781"}
 STATUS = {"good": "#0ca30c", "warning": "#fab219", "serious": "#ec835a", "critical": "#d03b3b"}
@@ -45,6 +46,7 @@ PLOT_CONFIG = {"displaylogo": False, "responsive": True,
 # pingme's own thresholds, stated in the footnote so nobody mistakes them for a standard
 LOSS_WARN, LOSS_CRIT = 1.0, 5.0
 PENALTY_WARN, PENALTY_CRIT = 50.0, 200.0
+BURST_WARN, BURST_CRIT = 2, 5
 
 
 def _fmt(v, nd: int = 1, unit: str = "") -> str:
@@ -108,9 +110,28 @@ def _timeline(entry: dict, marks: dict) -> go.Figure:
                                      meta={"role": phase},
                                      hovertemplate="%{x:.1f} s: %{y} ms<extra>" + phase + "</extra>"))
     _phase_bands(fig, marks)
+    _lost_marks(fig, entry)
     fig.update_layout(_layout("round trip over the run, ms"))
     fig.update_xaxes(title_text="seconds")
     return fig
+
+
+def _lost_marks(fig: go.Figure, entry: dict) -> None:
+    """Every probe that never came back, on the floor of the timeline, plus the worst burst."""
+    loss = entry.get("loss") or {}
+    lost = loss.get("lost") or []
+    if not lost:
+        return
+    fig.add_trace(go.Scatter(x=[t for _, t in lost], y=[0] * len(lost), mode="markers",
+                             name="lost", meta={"role": "lost"},
+                             marker={"color": LIGHT["lost"], "size": 7, "symbol": "x"},
+                             hovertemplate="%{x:.1f} s: probe lost<extra></extra>"))
+    if loss.get("longest_burst_probes", 0) >= BURST_WARN and loss.get("longest_burst_at_s"):
+        start = loss["longest_burst_at_s"]
+        fig.add_vrect(x0=start, x1=start + loss["longest_burst_s"], fillcolor=LIGHT["lost"],
+                      opacity=0.15, line_width=0, annotation_text="longest burst",
+                      annotation_position="top right",
+                      annotation_font={"size": 10, "color": STATUS["critical"]})
 
 
 def _throughput(sp: dict) -> go.Figure:
@@ -156,6 +177,19 @@ def _status(value: float | None, warn: float, crit: float) -> tuple[str, str]:
     return "good", "✓"
 
 
+def _loss_status(lost: int | None, loss_pct: float | None) -> tuple[str, str]:
+    """Green only when nothing at all went missing: the target is zero loss, not 1 %."""
+    if loss_pct is None or lost is None:
+        return "muted", "?"
+    if lost == 0:
+        return "good", "✓"
+    if loss_pct >= LOSS_CRIT:
+        return "critical", "✕"
+    if loss_pct >= LOSS_WARN:
+        return "serious", "▲"
+    return "warning", "▲"
+
+
 def _tile(label: str, value: str, sub: str = "", status: tuple[str, str] | None = None) -> str:
     badge = ""
     if status and status[0] != "muted":
@@ -181,18 +215,42 @@ def _stats_table(entry: dict) -> str:
             f"</tr></thead><tbody>{rows}</tbody></table></details>")
 
 
+def is_silent(entry: dict) -> bool:
+    """Nothing came back and ping itself did not fail: the target ignores probes."""
+    if entry.get("silent") is not None:
+        return bool(entry["silent"])
+    return not entry["samples"] and entry.get("error") in (None, "no replies")  # older runs
+
+
+def burst_probes(entry: dict) -> int:
+    return (entry.get("loss") or {}).get("longest_burst_probes") or 0
+
+
 def _target_section(name: str, entry: dict, marks: dict, i: int,
                     trace_entry: dict | None = None) -> str:
     a = entry["all"]
-    loss_status = _status(a["loss_pct"], LOSS_WARN, LOSS_CRIT)
+    silent = is_silent(entry)
+    lost = None if a["loss_pct"] is None else a["sent"] - a["received"]
+    loss_status = _loss_status(lost, a["loss_pct"])
     penalty = None
     if entry["busy"]["p95_ms"] is not None and entry["idle"]["p95_ms"] is not None:
         penalty = entry["busy"]["p95_ms"] - entry["idle"]["p95_ms"]
     pen_status = _status(penalty, PENALTY_WARN, PENALTY_CRIT)
     physics = entry.get("physics") or {}
-    facts = [f"loss {_fmt(a['loss_pct'], 1, '%')}", f"best {_fmt(a['min_ms'])} ms",
-             f"median {_fmt(a['median_ms'])} ms", f"p95 {_fmt(a['p95_ms'])} ms",
-             f"jitter {_fmt(a['jitter_ms'])} ms"]
+    facts = [f"loss {_fmt(a['loss_pct'], 1, '%')}"]
+    if lost is not None:
+        facts[0] += f" ({lost:,} of {a['sent']:,} probes)"
+    burst = burst_probes(entry)
+    if burst:
+        loss = entry["loss"]
+        badge = _status(burst, BURST_WARN, BURST_CRIT)
+        facts.append(f"longest burst {burst} probes ({loss['longest_burst_s']:.1f} s) "
+                     f'<span class="badge {badge[0]}">{badge[1]} burst</span>'
+                     if burst >= BURST_WARN else
+                     f"longest burst {burst} probe ({loss['longest_burst_s']:.1f} s)")
+    facts += [f"best {_fmt(a['min_ms'])} ms",
+              f"median {_fmt(a['median_ms'])} ms", f"p95 {_fmt(a['p95_ms'])} ms",
+              f"jitter {_fmt(a['jitter_ms'])} ms"]
     if penalty is not None:
         facts.append(f"under-load penalty {penalty:+.0f} ms "
                      f'<span class="badge {pen_status[0]}">{pen_status[1]} {pen_status[0]}</span>')
@@ -203,14 +261,20 @@ def _target_section(name: str, entry: dict, marks: dict, i: int,
         facts.append(f"timing estimate: {html.escape(physics['most_consistent'])} "
                      f"(~{physics['effective_ms']:.0f} ms after local overhead)")
     route = (entry.get("route") or {}).get("dev")
-    if entry.get("error") and not entry["samples"]:
+    if silent:
+        facts = [f"{a['sent']:,} probes sent, none came back"]
+        body = ('<p class="quiet">This address does not answer probes. That is a setting on '
+                "the device, not a fault on the line, so no loss figure is shown for it.</p>")
+    elif entry.get("error") and not entry["samples"]:
         body = f'<p class="error">{html.escape(entry["error"])}</p>'
     else:
         body = (f'<div class="pair">{_div(_hist(entry), f"h{i}")}{_div(_timeline(entry, marks), f"t{i}")}'
                 f"</div>{_stats_table(entry)}")
+    badge = ("" if silent else
+             f'<span class="badge {loss_status[0]}">{loss_status[1]} loss</span>')
     return (f'<section class="card" id="target-{name}"><h2>{name} '
             f'<span class="ip">{entry["ip"]}{" · via " + route if route else ""}</span>'
-            f'<span class="badge {loss_status[0]}">{loss_status[1]} loss</span></h2>'
+            f'{badge}</h2>'
             f'<p class="facts">{" · ".join(facts)}</p>{body}</section>')
 
 
@@ -244,7 +308,8 @@ h1{{font-size:20px;margin:0 0 2px}} h2{{font-size:15px;margin:0 0 6px}} h3{{font
 details{{margin:4px 0 0}} summary{{cursor:pointer;color:var(--muted);font-size:12px}}
 table.stats{{border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:12px;margin-top:6px;width:100%}}
 table.stats th,table.stats td{{text-align:right;padding:3px 8px;border-bottom:1px solid var(--grid)}} table.stats th:first-child{{text-align:left}}
-.error{{color:{STATUS['critical']}}} .foot{{color:var(--muted);font-size:12px;margin-top:20px}}
+.error{{color:{STATUS['critical']}}} .quiet{{color:var(--muted)}}
+.foot{{color:var(--muted);font-size:12px;margin-top:20px}}
 .plotly-graph-div{{width:100%}}
 """
 
@@ -315,7 +380,10 @@ def build_report(run: dict, traces: dict | None = None, *,
     targets = a["targets"]
     order = sorted(targets, key=lambda n: TARGET_ORDER.index(n) if n in TARGET_ORDER else 99)
     speeds = {x["direction"]: x for x in run["speed"]}
-    worst_loss = max((t["all"]["loss_pct"] for t in targets.values()), default=None)
+    measured = [t for t in targets.values() if t["all"]["loss_pct"] is not None]
+    worst_loss = max((t["all"]["loss_pct"] for t in measured), default=None)
+    lost_total = sum(t["all"]["sent"] - t["all"]["received"] for t in measured)
+    worst_burst = max((burst_probes(t) for t in targets.values()), default=0)
     sp_phys = (targets.get("sao-paulo") or {}).get("physics") or {}
 
     if s.get("medium") == "wifi" and s.get("wifi"):
@@ -340,8 +408,12 @@ def build_report(run: dict, traces: dict | None = None, *,
         _tile("upload", f"{speeds.get('upload', {}).get('mbps', 0):.1f} <small>Mbit/s</small>",
               f"{speeds.get('upload', {}).get('bytes_total', 0) / 1e6:.0f} MB in "
               f"{speeds.get('upload', {}).get('seconds', 0):.0f} s"),
-        _tile("worst packet loss", _fmt(worst_loss, 1, "%"), "across all targets",
-              _status(worst_loss, LOSS_WARN, LOSS_CRIT)),
+        _tile("worst packet loss", _fmt(worst_loss, 1, "%"),
+              f"{lost_total:,} probes lost across all targets",
+              _loss_status(lost_total, worst_loss)),
+        _tile("longest burst", f"{worst_burst} <small>probes</small>",
+              f"{worst_burst * INTERVAL_S:.1f} s in a row, worst target",
+              _status(worst_burst, BURST_WARN, BURST_CRIT)),
         _tile("local overhead", f"{a['local_overhead_ms']:.0f} <small>ms</small>",
               a["local_overhead_how"]),
         _tile("São Paulo route", html.escape(sp_phys.get("most_consistent") or "—"),
@@ -373,8 +445,11 @@ def build_report(run: dict, traces: dict | None = None, *,
 {map_html}
 <p class="foot">Round trips measured with the system ping at 5 per second per target; the speed
 test ran against Cloudflare while probing continued. "Under-load penalty" is the busy p95
-minus the idle p95. Badges use pingme's own thresholds: loss ≥{LOSS_WARN:g} % warning,
-≥{LOSS_CRIT:g} % critical; penalty ≥{PENALTY_WARN:g} ms warning, ≥{PENALTY_CRIT:g} ms critical.
+minus the idle p95. A burst is the longest run of probes lost back to back. Badges use
+pingme's own thresholds: any lost probe at all is flagged, loss ≥{LOSS_WARN:g} % serious,
+≥{LOSS_CRIT:g} % critical; burst ≥{BURST_WARN:g} probes warning, ≥{BURST_CRIT:g} critical;
+penalty ≥{PENALTY_WARN:g} ms warning, ≥{PENALTY_CRIT:g} ms critical. An address that never
+answers is reported as silent rather than as total loss.
 Route verdicts compare the best round trip, minus local overhead, with the time light needs
 through fibre along each candidate cable path (×1.3 for real cable routing).</p>
 </main><script>{_theme_js()}</script></body></html>"""

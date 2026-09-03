@@ -182,7 +182,7 @@ File: `src/pingme/render_tui.py`.
 - `_verdict_table`: add a `burst` column after `loss`, showing the probe count.
 - `cli.compare`: add a `longest_burst_probes` row per target.
 
-### [ ] Step 4: show it in the web report and the site index (45 min)
+### [x] Step 4: show it in the web report and the site index (45 min)
 
 Files: `src/pingme/render_web.py`, `src/pingme/store.py`, `src/pingme/publish.py`.
 

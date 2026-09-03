@@ -68,6 +68,10 @@ def summary_row(run: dict) -> dict:
     speed = {x["direction"]: x["mbps"] for x in run["speed"]}
     targets = run["analysis"]["targets"]
     sp = targets.get("sao-paulo") or {}
+    # a target with no loss figure at all never answers; it must not win "worst loss"
+    measured = [t["all"]["loss_pct"] for t in targets.values()
+                if t["all"]["loss_pct"] is not None]
+    bursts = [(t.get("loss") or {}).get("longest_burst_probes") or 0 for t in targets.values()]
     return {
         "id": run["id"],
         "label": run.get("label"),
@@ -78,7 +82,8 @@ def summary_row(run: dict) -> dict:
         "medium": s.get("medium"),
         "download_mbps": speed.get("download", 0.0),
         "upload_mbps": speed.get("upload", 0.0),
-        "worst_loss_pct": max((t["all"]["loss_pct"] for t in targets.values()), default=None),
+        "worst_loss_pct": max(measured, default=None),
+        "worst_burst_probes": max(bursts, default=0),
         "local_overhead_ms": run["analysis"]["local_overhead_ms"],
         "sao_paulo_p95_ms": (sp.get("all") or {}).get("p95_ms"),
         "sao_paulo_route": (sp.get("physics") or {}).get("most_consistent"),

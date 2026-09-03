@@ -44,6 +44,7 @@ def _index_row(row: dict) -> str:
         html.escape(row.get("medium") or "—"),
         f'{_fmt(row["download_mbps"])} / {_fmt(row["upload_mbps"])}',
         _fmt(row.get("worst_loss_pct")),
+        _fmt(row.get("worst_burst_probes"), 0),
         _fmt(row.get("sao_paulo_p95_ms"), 0),
         html.escape(row.get("sao_paulo_route") or "—"),
     ]
@@ -53,7 +54,7 @@ def _index_row(row: dict) -> str:
 def build_index(rows: list[dict]) -> str:
     """index.html: one table of published runs, newest first, each linking to its page."""
     heads = ("label", "date (UTC)", "ISP", "city", "medium", "down / up Mbit/s",
-             "worst loss %", "São Paulo p95 ms", "route verdict")
+             "worst loss %", "worst burst", "São Paulo p95 ms", "route verdict")
     ordered = sorted(rows, key=lambda r: r["timestamp"], reverse=True)
     body = "".join(_index_row(r) for r in ordered)
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
