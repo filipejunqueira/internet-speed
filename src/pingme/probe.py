@@ -9,7 +9,9 @@ import time
 from dataclasses import dataclass, field
 
 REPLY_RE = re.compile(r"icmp_seq=(\d+).*?time=([\d.]+)\s*ms")
+SUMMARY_RE = re.compile(r"(\d+) packets transmitted")
 INTERVAL_S = 0.2  # smallest interval allowed without root
+GRACE_S = 2  # extra seconds for ping to collect the replies to its last probes
 
 
 @dataclass
@@ -31,21 +33,37 @@ class ProbeResult:
     def rtts(self, phase: str | None = None) -> list[float]:
         return [s.rtt_ms for s in self.samples if phase is None or s.phase == phase]
 
-    def sent_in(self, phase: str | None) -> int:
-        if phase is None:
-            return self.sent
-        seqs = [s.seq for s in self.samples if s.phase == phase]
-        if not seqs:
-            return 0
-        # every sequence number in the phase's span was sent, replied or not
-        return max(seqs) - min(seqs) + 1
-
 
 def parse_reply(line: str) -> tuple[int, float] | None:
     m = REPLY_RE.search(line)
     if not m:
         return None
     return int(m.group(1)), float(m.group(2))
+
+
+def parse_summary(line: str) -> int | None:
+    """How many probes ping says it sent, from its closing statistics line."""
+    m = SUMMARY_RE.search(line)
+    return int(m.group(1)) if m else None
+
+
+def send_offset(samples: list[Sample]) -> float:
+    """When probe 1 left, in seconds since the run started.
+
+    ping sends on a fixed schedule, so probe k leaves at offset + (k - 1) * INTERVAL_S.
+    Every reply gives one estimate of that offset: the moment it came back, less its own
+    round trip, less its place in the schedule. The median ignores the odd late one.
+    """
+    if not samples:
+        return 0.0
+    est = sorted(s.t - s.rtt_ms / 1000.0 - (s.seq - 1) * INTERVAL_S for s in samples)
+    mid = len(est) // 2
+    return est[mid] if len(est) % 2 else (est[mid - 1] + est[mid]) / 2.0
+
+
+def send_time(seq: int, offset: float) -> float:
+    """When probe `seq` left, in seconds since the run started."""
+    return offset + (seq - 1) * INTERVAL_S
 
 
 class Phase:
@@ -55,13 +73,68 @@ class Phase:
         self.name = "idle"
 
 
+async def _read(stdout: asyncio.StreamReader, phase: Phase, t0: float,
+                result: ProbeResult) -> None:
+    """Read ping to the end of its output, keeping every reply and its own sent count."""
+    while True:
+        raw = await stdout.readline()
+        if not raw:
+            return
+        line = raw.decode(errors="replace")
+        parsed = parse_reply(line)
+        if parsed:
+            seq, rtt = parsed
+            result.samples.append(Sample(seq, rtt, time.monotonic() - t0, phase.name))
+            result.sent = max(result.sent, seq)  # stands in until the summary arrives
+            continue
+        transmitted = parse_summary(line)
+        if transmitted is not None:
+            # ping's own count is exact, and unlike the highest sequence number that
+            # came back it also counts the probes sent after the last reply.
+            result.sent = transmitted
+
+
+async def _stop(proc: asyncio.subprocess.Process) -> None:
+    """Wait for ping to exit, and end it if it will not."""
+    try:
+        await asyncio.wait_for(proc.wait(), timeout=3)
+    except TimeoutError:
+        proc.terminate()
+        try:
+            await asyncio.wait_for(proc.wait(), timeout=3)
+        except TimeoutError:
+            proc.kill()
+
+
+async def _note_failure(proc: asyncio.subprocess.Process, result: ProbeResult) -> None:
+    """Say why ping gave up. Exit code 1 is "nothing answered", which is a measurement."""
+    if result.error is not None or proc.returncode is None or proc.returncode < 2:
+        return
+    if proc.stderr is None:
+        result.error = f"ping exited {proc.returncode}"
+        return
+    try:
+        raw = await asyncio.wait_for(proc.stderr.read(), timeout=3)
+    except TimeoutError:
+        raw = b""
+    lines = [ln.strip() for ln in raw.decode(errors="replace").splitlines() if ln.strip()]
+    result.error = lines[-1] if lines else f"ping exited {proc.returncode}"
+
+
 async def _ping_one(target: str, ip: str, duration: float, phase: Phase,
                     t0: float, result: ProbeResult) -> None:
     exe = shutil.which("ping")
     if exe is None:
         result.error = "ping not found"
         return
-    cmd = [exe, "-n", "-i", str(INTERVAL_S), "-w", str(int(duration) + 1), ip]
+    count = max(1, int(duration / INTERVAL_S))
+    # -c is how many replies we want, not how many probes go out: alongside -w, ping
+    # keeps sending until `count` probes are answered or the deadline passes (checked
+    # 2026-09-03). A clean line therefore stops on time, and a lossy one keeps probing
+    # into the GRACE_S tail rather than cutting its last probe short and calling it
+    # loss. Either way the summary line says exactly how many probes went out.
+    cmd = [exe, "-n", "-c", str(count), "-i", str(INTERVAL_S),
+           "-w", str(int(duration) + GRACE_S), ip]
     try:
         proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE,
                                                     stderr=asyncio.subprocess.PIPE)
@@ -69,39 +142,17 @@ async def _ping_one(target: str, ip: str, duration: float, phase: Phase,
         result.error = str(e)
         return
     assert proc.stdout is not None
-    deadline = t0 + duration
     try:
-        while True:
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                break
-            try:
-                raw = await asyncio.wait_for(proc.stdout.readline(), timeout=remaining)
-            except TimeoutError:
-                break
-            if not raw:
-                break
-            line = raw.decode(errors="replace")
-            parsed = parse_reply(line)
-            if parsed:
-                seq, rtt = parsed
-                result.samples.append(Sample(seq, rtt, time.monotonic() - t0, phase.name))
-                result.sent = max(result.sent, seq)
+        await asyncio.wait_for(_read(proc.stdout, phase, t0, result),
+                               timeout=duration + GRACE_S + 5)
+    except TimeoutError:
+        result.error = "ping did not finish in time"
     finally:
-        if proc.returncode is None:
-            proc.terminate()
-            try:
-                await asyncio.wait_for(proc.wait(), timeout=3)
-            except TimeoutError:
-                proc.kill()
-    # Count what was really sent, from the highest sequence number that came back.
-    # An estimate from the clock (duration / INTERVAL_S) overshoots by one probe or
-    # more, which invents packet loss on a perfect line. With nothing back at all
-    # there is no sequence to read, so the clock estimate is the only option.
-    if not result.samples:
-        result.sent = int(duration / INTERVAL_S)
-        if result.error is None:
-            result.error = "no replies"
+        await _stop(proc)
+    await _note_failure(proc, result)
+    if result.sent == 0:
+        # Neither a summary line nor a reply: fall back to what we asked ping for.
+        result.sent = count
 
 
 async def probe_all(targets: list[tuple[str, str]], duration: float, phase: Phase,

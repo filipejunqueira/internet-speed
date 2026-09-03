@@ -11,9 +11,9 @@ from dataclasses import dataclass
 
 from . import speed
 from .places import FORTALEZA, LONDON, MIAMI, NEW_YORK, SINES
-from .probe import Phase, ProbeResult, probe_all
+from .probe import INTERVAL_S, Phase, ProbeResult, probe_all, send_offset, send_time
 from .snapshot import route_for, take_snapshot
-from .stats import RouteCandidate, physics_verdict, summarise
+from .stats import RouteCandidate, longest_burst, lost_seqs, physics_verdict, summarise
 from .store import append_run
 from .targets import Target, fetch_sdr, local_targets, parse_sdr
 
@@ -132,20 +132,72 @@ def _local_overhead(results: list[ProbeResult], targets: dict[str, Target],
     return round(max(best_gap, 0.0), 1), how
 
 
-def analyse(results: list[ProbeResult], targets: list[Target], snapshot: dict) -> dict:
+def phase_at(t: float, marks: dict) -> str:
+    """What the connection was doing `t` seconds into the run."""
+    download, upload, back = (marks.get("download"), marks.get("upload"),
+                              marks.get("idle-again"))
+    if download is not None and upload is not None and download <= t < upload:
+        return "download"
+    if upload is not None and back is not None and upload <= t < back:
+        return "upload"
+    return "idle"
+
+
+def account_for_probes(r: ProbeResult, marks: dict) -> tuple[dict, dict[str, int]]:
+    """Which probes never came back, and how many went out in each phase.
+
+    A reply counts towards the phase it arrived in. A lost probe has no arrival, so it
+    counts towards the phase it was sent in, worked out from ping's fixed schedule.
+    Every probe therefore belongs to exactly one phase, which is what makes the
+    per-phase loss figures add up.
+    """
+    offset = send_offset(r.samples)
+    lost = lost_seqs(r.sent, (s.seq for s in r.samples))
+    sent_in: dict[str, int] = {"idle": 0, "download": 0, "upload": 0}
+    for s in r.samples:
+        sent_in[s.phase] = sent_in.get(s.phase, 0) + 1
+    lost_at = []
+    for seq in lost:
+        left = send_time(seq, offset)
+        phase = phase_at(left, marks)
+        sent_in[phase] = sent_in.get(phase, 0) + 1
+        lost_at.append([seq, round(left, 3)])
+    length, start = longest_burst(lost)
+    detail = {
+        "lost": lost_at,
+        "longest_burst_probes": length,
+        "longest_burst_s": round(length * INTERVAL_S, 2),
+        "longest_burst_at_s": round(send_time(start, offset), 3) if length else None,
+    }
+    return detail, sent_in
+
+
+def analyse(results: list[ProbeResult], targets: list[Target], snapshot: dict,
+            marks: dict, route=route_for) -> dict:
     by_name = {t.name: t for t in targets}
     origin = _origin(snapshot)
     overhead, overhead_how = _local_overhead(results, by_name, origin)
     per_target = {}
     for r in results:
         t = by_name[r.target]
+        detail, sent_in = account_for_probes(r, marks)
+        # Nothing at all came back and ping itself did not fail: the target ignores
+        # probes, which is not the same as a line losing 100 % of them. Report no loss
+        # figure rather than a frightening one; the sent count still says what we tried.
+        silent = not r.samples and r.error is None
+        summaries = [summarise(r.rtts(), r.sent),
+                     summarise(r.rtts("idle"), sent_in["idle"]),
+                     summarise(r.rtts("download") + r.rtts("upload"),
+                               sent_in["download"] + sent_in["upload"])]
+        if silent:
+            summaries = [x.without_loss() for x in summaries]
         entry: dict = {
-            "ip": r.ip, "kind": t.kind, "error": r.error,
-            "route": route_for(r.ip),
-            "all": summarise(r.rtts(), r.sent).as_dict(),
-            "idle": summarise(r.rtts("idle"), r.sent_in("idle")).as_dict(),
-            "busy": summarise(r.rtts("download") + r.rtts("upload"),
-                              r.sent_in("download") + r.sent_in("upload")).as_dict(),
+            "ip": r.ip, "kind": t.kind, "error": r.error, "silent": silent,
+            "route": route(r.ip),
+            "all": summaries[0].as_dict(),
+            "idle": summaries[1].as_dict(),
+            "busy": summaries[2].as_dict(),
+            "loss": detail if r.samples else None,
             "samples": [(s.seq, s.rtt_ms, round(s.t, 3), s.phase) for s in r.samples],
         }
         if t.kind == "relay" and r.samples and t.lat is not None:
@@ -176,7 +228,7 @@ def run(label: str | None, timing: Timing, status=lambda msg: None,
     phase = Phase()
     results, speeds, marks = asyncio.run(_orchestrate(targets, timing, phase, status))
     status("crunching numbers …")
-    analysis = analyse(results, targets, snapshot)
+    analysis = analyse(results, targets, snapshot, marks)
     record = {
         "id": make_run_id(label, when),
         "label": label,

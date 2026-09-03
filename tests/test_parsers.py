@@ -37,3 +37,24 @@ def test_loss_counts_only_probes_that_were_really_sent():
     perfect.samples = [Sample(seq, 10.0, seq * 0.2, "idle") for seq in range(1, 300)]
     perfect.sent = max(s.seq for s in perfect.samples)
     assert summarise(perfect.rtts(), perfect.sent).loss_pct == 0.0
+
+
+def test_parse_ping_summary_gives_the_exact_sent_count():
+    from pingme.probe import parse_summary
+
+    line = "300 packets transmitted, 299 received, 0.333333% packet loss, time 59900ms"
+    assert parse_summary(line) == 300
+    assert parse_summary("64 bytes from 1.1.1.1: icmp_seq=7 ttl=54 time=48.3 ms") is None
+    assert parse_summary("rtt min/avg/max/mdev = 10.6/12.0/14.8/1.1 ms") is None
+
+
+def test_send_offset_recovers_pings_fixed_schedule():
+    """Probe k leaves at offset + (k-1)*0.2; a reply lands one round trip later."""
+    from pingme.probe import Sample, send_offset, send_time
+
+    offset = 0.37
+    samples = [Sample(seq, 50.0, offset + (seq - 1) * 0.2 + 0.05, "idle")
+               for seq in (1, 2, 3, 7)]
+    assert abs(send_offset(samples) - offset) < 1e-9
+    assert abs(send_time(4, offset) - (offset + 0.6)) < 1e-9
+    assert send_offset([]) == 0.0

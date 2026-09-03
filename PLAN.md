@@ -51,8 +51,16 @@ next to `all 300/0 100 %`. Same record, three answers.
   receive time; lost probes get a phase from their send time against `phase_marks_s`.
   Every sequence number then belongs to exactly one phase, which is what fixes A.
 - Burst badge thresholds, pingme's own, stated in the report footnote like the others:
-  warning at 2 consecutive lost probes (0.4 s), critical at 5 (1 s). Adjust at review
-  if you want different numbers.
+  warning at 2 consecutive lost probes (0.4 s), critical at 5 (1 s). Confirmed by the
+  user on 2026-09-03. A burst of 1 probe gets no badge of its own; the loss badge
+  below already flags it.
+- **Zero loss is the only clean pass** (user, 2026-09-03: "ideally we want to have no
+  loss whatsoever"). Today `_status` returns a green tick for anything under 1 %, so
+  1 packet lost in 1,495 reads as perfect. The loss badge becomes:
+  0 lost is good, above 0 and under 1 % is warning, 1 % to 5 % is serious, 5 % and
+  above is critical. `STATUS["serious"]` already exists and is unused. This changes
+  `render_web._status` calls for loss only, plus the footnote, in step 4, and the
+  terminal head line in step 3.
 - Old records keep their stored analysis. `pingme show` on an old run still prints the
   old idle number. Renderers must tolerate records without the new fields. A
   `pingme reanalyse` command that recomputes from the saved samples goes to TODO.md
@@ -88,7 +96,15 @@ Each step is one commit. Grep the file for every change after a multi-part edit
   with `→ PLAN.md`); add to Later: `pingme reanalyse` (recompute analysis from saved
   samples), upload over-count (see review notes), snapshots `.gitignore` decision.
 
-### [ ] Step 1: exact sent count from ping itself (25 min)
+### [x] Step 1: exact sent count from ping itself (25 min)
+
+Done 2026-09-03, committed with step 2: removing `sent_in` in step 1 breaks the one
+caller in `run.py`, and a commit that does not run is worse than a large one.
+Checked against the real `ping` here: a normal run prints
+"10 packets transmitted, 10 received" and exits 0; a target that ignores probes prints
+its summary and exits 1; an unknown host exits 2 with a message on stderr. `-c` turned
+out to mean "probes answered", not "probes sent", so a lossy line keeps probing into
+the 2 s grace tail instead of having its last probe cut short.
 
 File: `src/pingme/probe.py`.
 
@@ -109,7 +125,7 @@ Note for the executor: ping with `-w 30` sends its last probe at about 29.8 s an
 exits at 30 s, so `_orchestrate`'s `await probes` returns at the same moment as
 before. If a run shows the process lingering, the safety timeout above ends it.
 
-### [ ] Step 2: per-probe accounting in the analysis (60 min)
+### [x] Step 2: per-probe accounting in the analysis (60 min)
 
 Files: `src/pingme/stats.py`, `src/pingme/probe.py`, `src/pingme/run.py`.
 
@@ -172,6 +188,11 @@ Files: `src/pingme/render_web.py`, `src/pingme/store.py`, `src/pingme/publish.py
 
 - `BURST_WARN, BURST_CRIT = 2, 5` next to the other thresholds; footnote sentence
   added: "burst ≥2 probes (0.4 s) warning, ≥5 (1 s) critical".
+- Loss badge: replace `LOSS_WARN, LOSS_CRIT = 1.0, 5.0` and the `_status` call for
+  loss with a `_loss_status(lost_probes, loss_pct)` that returns good only when
+  `lost_probes == 0`. Above 0 and under 1 % warning, 1 % to 5 % serious, 5 % and above
+  critical. Footnote: "any lost probe is flagged; loss ≥1 % serious, ≥5 % critical".
+  `_status` keeps its shape for the under-load penalty and the burst.
 - `_target_section`: silent target shows `<p class="muted">does not answer probes
   (N sent, 0 back)</p>` instead of the error paragraph and gets no loss badge. Facts
   line gains `lost N of M` and `longest burst n probes (s s) at t s` with a badge.

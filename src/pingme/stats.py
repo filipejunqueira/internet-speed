@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from collections.abc import Iterable
+from dataclasses import asdict, dataclass, replace
 from math import asin, cos, radians, sin, sqrt
 
 import numpy as np
@@ -17,7 +18,7 @@ CABLE_DETOUR_FACTOR = 1.3
 class Summary:
     sent: int
     received: int
-    loss_pct: float
+    loss_pct: float | None
     min_ms: float | None
     median_ms: float | None
     mean_ms: float | None
@@ -29,6 +30,10 @@ class Summary:
 
     def as_dict(self) -> dict:
         return asdict(self)
+
+    def without_loss(self) -> Summary:
+        """The same numbers with no loss figure, for a target that never answers at all."""
+        return replace(self, loss_pct=None)
 
 
 def summarise(rtts: list[float], sent: int) -> Summary:
@@ -51,6 +56,31 @@ def summarise(rtts: list[float], sent: int) -> Summary:
         stdev_ms=round(float(a.std(ddof=0)), 3),
         jitter_ms=round(jitter(rtts), 3),
     )
+
+
+def lost_seqs(sent: int, replied: Iterable[int]) -> list[int]:
+    """The sequence numbers among the first `sent` probes that never came back."""
+    seen = set(replied)
+    return [n for n in range(1, sent + 1) if n not in seen]
+
+
+def longest_burst(lost: list[int]) -> tuple[int, int]:
+    """Length and first sequence number of the longest run of consecutive losses.
+
+    `lost` must be ascending. A burst is what a game actually feels: ten losses in a
+    row freeze it, while ten spread over a minute pass unnoticed. Ties go to the
+    earliest burst. Nothing lost gives (0, 0).
+    """
+    best: tuple[int, int] = (0, 0)
+    start = 0
+    previous = None
+    for n in lost:
+        if previous is None or n != previous + 1:
+            start = n
+        previous = n
+        if n - start + 1 > best[0]:
+            best = (n - start + 1, start)
+    return best
 
 
 def jitter(rtts: list[float]) -> float:

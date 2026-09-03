@@ -28,7 +28,10 @@ Last updated: 2026-09-03
       buffer, not when it leaves the machine. Three streams × 64 KB at the deadline is
       ~8 % on a 2 Mbit/s uplink over 10 s, noise on a fast line
 - [ ] Decide: `.gitignore` ignores `notes/snapshots/` but the snapshot skill treats
-      snapshots as tracked history. Pick a side
+      snapshots as tracked history. Pick a side. Both GitHub repos are public
+      (checked 2026-09-03 via the API). Recommendation: leave it ignored. CLAUDE.md
+      already ranks TODO.md and PLAN.md above snapshots, and the wrap-up copies each
+      decision with its reasoning into `notes/plans/`, which is tracked
 - [ ] Live refreshing display (htop-style) instead of run-draw-exit
 - [ ] IPv6 traces (Three shows its IPv6 hops; the relays are IPv4 only)
 - [ ] Read the Three router's 5G signal from its admin page
