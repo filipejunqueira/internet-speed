@@ -161,15 +161,15 @@ def _verdict_table(run: dict) -> Table:
     targets = run["analysis"]["targets"]
     for name in sorted(targets, key=lambda n: TARGET_ORDER.index(n) if n in TARGET_ORDER else 99):
         e = targets[name]
-        a, b = e["all"], e["busy"]
+        a, busy = e["all"], e["busy"]
         verdict = (e.get("physics") or {}).get("most_consistent") or ""
         # "—" means nobody counted; a measured run with nothing lost says 0
-        b = burst_probes(e)
-        burst = "—" if b is None else str(b)
+        longest = burst_probes(e)
+        burst = "—" if longest is None else str(longest)
         t.add_row(name, _fmt(a["loss_pct"], "%"), burst,
                   _fmt(a["min_ms"]), _fmt(a["median_ms"]),
                   _fmt(a["p95_ms"]), _fmt(a["p99_ms"]), _fmt(a["jitter_ms"]),
-                  _fmt(b["p95_ms"]), verdict)
+                  _fmt(busy["p95_ms"]), verdict)
     return t
 
 
