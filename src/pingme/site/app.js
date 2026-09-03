@@ -309,9 +309,14 @@ function timelinePanels(runs) {
 /** What the map leaves out: a run measured without `--web` or `--publish` has no route. */
 function mapNote(runs, target) {
   const missing = untracedRuns(runs, target).map((run) => dom.esc(dom.runName(run)))
+  // A run measured without --web or --publish carries no route in its saved record, even
+  // when it was published later and its own page shows one: publishing traced the route
+  // then but the record in the log never learned it. Say that, rather than claiming the
+  // route was never traced, so the two pages do not appear to contradict each other.
   const omitted = missing.length
-    ? ` No route was traced for ${missing.join(' and ')}, so ` +
-      `${missing.length > 1 ? 'those runs are' : 'that run is'} not on the map.`
+    ? ` No route is saved with ${missing.join(' or ')}, so ` +
+      `${missing.length > 1 ? 'those runs are' : 'that run is'} not drawn here. ` +
+      'Its own report page may still show one, traced when it was published.'
     : ''
   return '<p class="note">Each point is where a hop answered from, which is not the same as ' +
     'where the cable goes. A dashed leg jumps over hops that did not answer.' + omitted + '</p>'
@@ -457,7 +462,7 @@ async function boot() {
   // Both are three today; a link written against a wider palette would otherwise ask for a
   // colour that does not exist. readState hands back slots packed from zero, so taking the
   // first few keeps every run on a slot it already held.
-  state = clampToPalette(readState(location.search, DEFAULT_TARGET), tokens.maxRuns)
+  state = clampToPalette(readState(location.search, DEFAULT_TARGET, tokens.maxRuns), tokens.maxRuns)
   // The run column sorts on `label` but shows runName(row), and a run saved without a
   // label has none: 2026-09-03T13-14-53Z in the log is one. Deriving the label once, here,
   // makes the string the table sorts on the same string it prints.

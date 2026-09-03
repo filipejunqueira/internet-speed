@@ -338,3 +338,35 @@ test('a run with no route to this target is named rather than drawn', () => {
   const { data } = mapFigure([noTraces, otherTarget, traced], 'sao-paulo', TOKENS)
   assert.deepEqual([...new Set(data.filter(t => t.mode === 'lines').map(t => t.name))], ['new'])
 })
+
+test('the relay ends the hop table too, so its address is not hover-only', () => {
+  // The map draws the relay as the last point even when the hops before it went unanswered.
+  // Without a row of its own here, the one address a reader most wants would be reachable
+  // only with a pointer, which is the reason this table exists.
+  const run = {
+    id: 'r', label: 'r', slot: 0,
+    analysis: {origin: [53.8, -1.55]},
+    targets: [{name: 'sao-paulo', ip: '155.133.227.35', city: 'Sao Paulo',
+      lat: -23.55, lon: -46.63}],
+    traces: {'sao-paulo': {
+      hops: [{n: 1, ip: '10.0.0.1', avg_ms: 3.0, loss_pct: 0},
+             {n: 2, ip: null, avg_ms: null, loss_pct: null},
+             {n: 3, ip: '1.2.3.4', avg_ms: 200.0, loss_pct: 0}],
+      locations: [{ip: '10.0.0.1', lat: 51.5, lon: -0.13, city: 'London', source: 'ip-api'},
+                  null,
+                  {ip: '1.2.3.4', lat: 25.77, lon: -80.19, city: 'Miami', source: 'ip-api'}]
+    }}
+  }
+  const [entry] = hopRows([run], 'sao-paulo')
+  const last = entry.points[entry.points.length - 1]
+  assert.equal(last.city, 'Sao Paulo')
+  assert.equal(last.ip, '155.133.227.35')
+  assert.equal(last.n, entry.points.length, 'it is numbered after the hops, not among them')
+  assert.equal(last.hiddenBefore, 0, 'nothing went unanswered between Miami and the relay')
+
+  // A relay that a hop already landed on is not written twice.
+  run.targets[0].lat = 25.77
+  run.targets[0].lon = -80.19
+  const [same] = hopRows([run], 'sao-paulo')
+  assert.equal(same.points.length, 2, 'Miami is the relay, so there is no extra row')
+})

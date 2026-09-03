@@ -89,8 +89,11 @@ export function selectedIds(state) {
  * Anything unknown or malformed falls back to the default rather than throwing, because
  * this string is whatever somebody happened to paste into the address bar.
  */
-export function readState(search, defaultTarget) {
+export function readState(search, defaultTarget, maxRuns) {
   const state = emptyState(defaultTarget)
+  // The caller passes the palette size from the tokens block. The module constant is
+  // only the fallback, for a call made before those tokens are in hand.
+  const cap = Number.isInteger(maxRuns) && maxRuns > 0 ? maxRuns : DEFAULT_MAX_RUNS
   const params = new URLSearchParams(typeof search === 'string' ? search : '')
 
   // Slots come from the order the ids are written in, which is why writeState emits them
@@ -101,7 +104,7 @@ export function readState(search, defaultTarget) {
     const trimmed = id.trim()
     if (!trimmed || seen.has(trimmed)) continue
     seen.add(trimmed)
-    if (state.selected.length >= DEFAULT_MAX_RUNS) break
+    if (state.selected.length >= cap) break
     state.selected.push({id: trimmed, slot: state.selected.length})
   }
 

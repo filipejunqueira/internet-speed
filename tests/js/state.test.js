@@ -212,3 +212,14 @@ test('an unknown column leaves the rows as they were', () => {
   assert.deepEqual(sortRows(rows, 'nonsense', 'asc').map(r => r.id), ['a', 'b', 'c'])
   assert.deepEqual(sortRows(rows, 'nonsense', 'desc').map(r => r.id), ['a', 'b', 'c'])
 })
+
+test('a shared link is capped by the palette the page was given, not by this module', () => {
+  // The cap belongs to whoever knows how many colours exist, which is the tokens block.
+  // The module constant stays as the fallback for a call made before those are in hand.
+  assert.equal(readState('?runs=a,b,c,d,e', 'sao-paulo', 2).selected.length, 2)
+  assert.equal(readState('?runs=a,b,c,d,e', 'sao-paulo', 4).selected.length, 4)
+  assert.equal(readState('?runs=a,b,c,d,e', 'sao-paulo').selected.length, 3, 'the fallback')
+  assert.equal(readState('?runs=a,b,c,d,e', 'sao-paulo', 0).selected.length, 3, 'nonsense too')
+  assert.deepEqual(readState('?runs=a,b,c,d', 'sao-paulo', 4).selected.map((s) => s.slot),
+    [0, 1, 2, 3], 'slots stay packed from zero whatever the cap')
+})

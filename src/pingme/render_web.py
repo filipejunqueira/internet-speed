@@ -345,9 +345,10 @@ def explorer_css() -> str:
 .picker td.num{text-align:right}
 .picker tbody tr{cursor:pointer}
 .picker tbody tr:hover td{background:rgba(137,135,129,0.08)}
+.picker tbody tr.on:hover td{background:rgba(137,135,129,0.22)}
 /* a neutral tint: a selected row must not wear the colour that means "first run ticked" */
 .picker tr.on td{background:rgba(137,135,129,0.16)}
-.tick{display:inline-block;width:16px;height:16px;border:1.5px solid var(--axis);border-radius:4px;vertical-align:middle;background:var(--surface)}
+.tick{display:inline-block;width:16px;height:16px;border:1.5px solid var(--ink2);border-radius:4px;vertical-align:middle;background:var(--surface)}
 .tick.on{border-color:var(--ink);background:var(--ink)}
 .sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:8px;vertical-align:middle}
 #pick{overflow-x:auto}

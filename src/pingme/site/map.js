@@ -256,6 +256,18 @@ export function hopRows(runs, target) {
       return { n: j + 1, city: point.city, ip: point.ip, ms: point.ms, step,
         hiddenBefore: point.hiddenBefore }
     })
+    // The relay itself ends the route on the map even when the last hops never answered,
+    // so it needs a row here too: otherwise its address is readable only by hovering,
+    // which is the whole reason this table exists.
+    const relay = targetRecord(run, target)
+    const last = drawnPoints[drawnPoints.length - 1]
+    const placed = relay && relay.lat !== null && relay.lat !== undefined
+    const sameSpot = placed && last && Math.abs(relay.lat - last.lat) < COLLAPSE_DEG &&
+      Math.abs(relay.lon - last.lon) < COLLAPSE_DEG
+    if (placed && !sameSpot) {
+      points.push({ n: points.length + 1, city: relay.city || target, ip: relay.ip || null,
+        ms: null, step: null, hiddenBefore: walk(traceFor(run, target), origin).hiddenAfter })
+    }
     return { id: run.id, label: runName(run), slot: slotFor(run, i), points }
   })
 }

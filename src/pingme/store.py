@@ -97,7 +97,9 @@ def summary_row(run: dict) -> dict:
         "id": run["id"],
         "label": run.get("label"),
         "timestamp": run["timestamp"],
-        "duration_s": run["duration_s"],
+        # .get(): every other optional field on this row uses it, and a record without
+        # a duration would otherwise take down both publish() and `pingme list`.
+        "duration_s": run.get("duration_s"),
         "isp": pub.get("isp"),
         "city": pub.get("city"),
         "country": pub.get("country"),

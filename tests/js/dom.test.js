@@ -137,9 +137,12 @@ test('one run ticked gets no colour chip, two or three get one each', () => {
   const sort = {key: 'timestamp', dir: 'desc'}
   // With one run ticked the report below is that run's own page, which draws London,
   // Madrid and US-East in these very three colours: a chip would read as one of those.
+  // It keeps its space though, drawn transparent. Removing the element outright shifted
+  // the whole name column sideways on the first tick and back again on the second.
   const one = pickerTable(rows, {selected: [{id: 'santander', slot: 0}], sort}, TOKENS)
-  assert.ok(!one.includes('class="sw"'), 'no chip belongs on the table with one run ticked')
-  assert.ok(!one.includes('#2a78d6') && !one.includes('transparent'))
+  assert.equal((one.match(/class="sw"/g) || []).length, 2, 'the chips hold their space')
+  assert.ok(!one.includes('#2a78d6'), 'but none of them carries a run colour')
+  assert.equal((one.match(/background:transparent/g) || []).length, 2)
   assert.ok(one.includes('santander'), 'the name is still there')
 
   // Two ticked and the chips are the legend for every chart below, so they come back.
@@ -307,7 +310,7 @@ test('the hop table writes out every value the map only shows on hover', () => {
   const html = hopTable([hopEntry()], TOKENS)
   assert.ok(html.startsWith('<details><summary>every hop, and where the time goes</summary>'))
   assert.ok(html.endsWith('</details>'))
-  assert.equal((html.match(/<table class="stats">/g) || []).length, 1)
+  assert.equal((html.match(/<table class="stats hops">/g) || []).length, 1)
   // the run is named once, in a caption row above the column heads, wearing its colour
   assert.ok(html.includes('<tr><th colspan="5"><span class="sw" data-slot="0" ' +
     'style="background:#2a78d6"></span>leeds</th></tr>'))
@@ -338,7 +341,7 @@ test('the hops that never answered are counted in a muted row of their own', () 
 test('one table per run, each in its own colour', () => {
   const html = hopTable([hopEntry(), hopEntry({id: 'santander', label: 'santander', slot: 1})],
     TOKENS)
-  assert.equal((html.match(/<table class="stats">/g) || []).length, 2)
+  assert.equal((html.match(/<table class="stats hops">/g) || []).length, 2)
   assert.equal((html.match(/<details>/g) || []).length, 1, 'one collapsed block holds them all')
   assert.ok(html.includes('#2a78d6') && html.includes('#eb6834'))
   assert.ok(html.indexOf('leeds') < html.indexOf('santander'), 'slot order is kept')

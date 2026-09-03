@@ -106,6 +106,9 @@ export function pickerTable(rows, state, tokens) {
   // are never on screen together — and with one run ticked the report below the table is
   // that run's own page, drawing those three targets in those very colours. A chip has
   // nothing to say at that point either: there is no second run to tell it apart from.
+  // The chip still occupies its space at one tick, drawn transparent: dropping the
+  // element outright shifted the whole name column sideways on the first tick and back
+  // on the second.
   const chips = ((state && state.selected) || []).length !== 1
   const heads = PICKER_COLUMNS.map((col) => {
     const sorted = col.key === sort.key
@@ -116,14 +119,16 @@ export function pickerTable(rows, state, tokens) {
   }).join('')
   const body = rows.map((row) => pickerRow(row, state, tokens, chips)).join('')
   return '<table class="picker"><thead><tr><th class="tickcol"></th>' + heads +
-    `</tr></thead><tbody>${body}</tbody></table>`
+    `</tr></thead><tbody>${body}</tbody></table>` +
+    '<p class="hint">Tick one run to read its full report. Tick two or three to compare them: ' +
+    'each keeps its colour on every chart and on the map.</p>'
 }
 
 function pickerRow(row, state, tokens, chips) {
   const slot = slotFor(state, row.id)
   const ticked = slot !== null
   const cells = [
-    `<td class="run">${chips ? swatch(slot, tokens) : ''}${esc(runName(row))}</td>`,
+    `<td class="run">${swatch(chips ? slot : null, tokens)}${esc(runName(row))}</td>`,
     `<td>${dateText(row.timestamp)}</td>`,
     `<td>${orDash(row.isp)}</td>`,
     `<td>${orDash(row.city)}</td>`,
@@ -203,7 +208,7 @@ export function diffTable(rows, runs, target, tokens) {
 export function hopTable(entries, tokens) {
   if (!entries || !entries.length) return ''
   const tables = entries.map((entry) =>
-    '<table class="stats">' +
+    '<table class="stats hops">' +
     `<thead><tr><th colspan="5">${swatch(entry.slot, tokens)}${esc(entry.label)}</th></tr>` +
     '<tr><th>#</th><th>address</th><th>placed</th><th>reached in ms</th>' +
     `<th>added ms</th></tr></thead><tbody>${(entry.points || []).map(hopRow).join('')}` +
