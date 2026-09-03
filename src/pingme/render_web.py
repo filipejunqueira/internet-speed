@@ -298,7 +298,8 @@ def _css() -> str:
 
     def block(c, dark=False):
         return (f"--surface:{c['surface']};--page:{c['page']};--ink:{c['ink']};--ink2:{c['ink2']};"
-                f"--muted:{c['muted']};--grid:{c['grid']};--border:{c['border']};"
+                f"--muted:{c['muted']};--grid:{c['grid']};--axis:{c['axis']};"
+                f"--border:{c['border']};"
                 f"color-scheme:{'dark' if dark else 'light'};")
 
     return f"""
@@ -329,6 +330,79 @@ table.hops tr.quiet td{{text-align:left;color:var(--muted)}} table.hops small{{c
 .foot{{color:var(--muted);font-size:12px;margin-top:20px}}
 .plotly-graph-div{{width:100%}}
 """
+
+
+def explorer_css() -> str:
+    """The rules the explorer shell needs on top of _css(): picker, run tiles, diff table.
+
+    Kept in its own function because the per-run report pages never use any of it, and
+    the explorer is the only page that has a table you can tick and charts side by side.
+    """
+    return """.picker{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+.picker th{font-weight:600;color:var(--ink2);text-align:left;padding:6px 8px;border-bottom:1px solid var(--axis);white-space:nowrap;cursor:pointer;user-select:none}
+.picker th.num{text-align:right}
+.picker td{padding:7px 8px;border-bottom:1px solid var(--grid);white-space:nowrap}
+.picker td.num{text-align:right}
+.picker tbody tr{cursor:pointer}
+.picker tbody tr:hover td{background:rgba(137,135,129,0.08)}
+/* a neutral tint: a selected row must not wear the colour that means "first run ticked" */
+.picker tr.on td{background:rgba(137,135,129,0.16)}
+.tick{display:inline-block;width:16px;height:16px;border:1.5px solid var(--axis);border-radius:4px;vertical-align:middle;background:var(--surface)}
+.tick.on{border-color:var(--ink);background:var(--ink)}
+.sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:8px;vertical-align:middle}
+#pick{overflow-x:auto}
+.hint{color:var(--muted);font-size:12px;margin:8px 0 0}
+.runs{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin:0 0 14px}
+/* the picker's name cell is a td.run as well, so the tile look stays inside the tile grid */
+.runs .run{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;border-top:3px solid var(--axis)}
+.runs .run .name{font-weight:600;font-size:14px}
+.runs .run .sub{color:var(--ink2);font-size:12px;margin:2px 0 8px}
+.runs .run .speed{font-size:22px;font-weight:600}
+.runs .run .speed small{font-size:12px;font-weight:400;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--axis);border-radius:8px;overflow:hidden;font-size:13px;vertical-align:middle}
+.seg span{padding:6px 12px;border-right:1px solid var(--grid);color:var(--ink2);cursor:pointer}
+.seg span:last-child{border-right:0}
+.seg span.on{background:var(--ink);color:var(--surface);font-weight:600}
+.filter{display:flex;align-items:center;gap:12px;margin:18px 0 12px;font-size:13px;color:var(--ink2);flex-wrap:wrap}
+.diff{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+.diff th,.diff td{text-align:right;padding:5px 10px;border-bottom:1px solid var(--grid)}
+.diff th:first-child,.diff td:first-child{text-align:left;color:var(--ink2);font-weight:400}
+.diff thead th{color:var(--ink2);font-weight:600;border-bottom:1px solid var(--axis)}
+.diff td.best{font-weight:600;color:var(--ink)}
+.ctitle{font-size:13px;color:var(--ink2);margin:0 0 4px}
+.note{color:var(--muted);font-size:12px;margin:6px 0 0}
+.empty{padding:34px 16px;text-align:center;color:var(--ink2)}
+.empty b{display:block;font-size:16px;color:var(--ink);margin-bottom:4px}
+.frame{width:100%;border:0;display:block;min-height:600px}
+.refused{color:var(--ink2);font-size:13px;margin:8px 0 0}
+main.loading{opacity:0.55;transition:opacity 120ms}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:900px){.grid2{grid-template-columns:1fr}}
+"""
+
+
+def explorer_tokens() -> dict:
+    """Colours, target order and thresholds for the explorer, emitted into the page as JSON.
+
+    The comparison charts are drawn in JavaScript, so this is how they stay in step with
+    the Python report pages: nothing on the site hard-codes a hex or a threshold, it all
+    comes from here. The three run slots are the categorical slots the palette validator
+    passes on the map in both light and dark; a fourth hue fails the colour-blindness
+    check against orange, which is why at most three runs can be ticked at once.
+    """
+    slots = ["london", "madrid", "us-east"]
+    return {
+        "runSlots": {"light": [LIGHT[k] for k in slots], "dark": [DARK[k] for k in slots]},
+        "chrome": copy.deepcopy(CHROME),
+        "status": dict(STATUS),
+        "targetOrder": list(TARGET_ORDER),
+        "thresholds": {"lossWarn": LOSS_WARN, "lossCrit": LOSS_CRIT,
+                       "penaltyWarn": PENALTY_WARN, "penaltyCrit": PENALTY_CRIT,
+                       "burstWarn": BURST_WARN, "burstCrit": BURST_CRIT},
+        "intervalS": INTERVAL_S,
+        "maxRuns": len(slots),
+        "font": FONT,
+    }
 
 
 def _theme_js() -> str:

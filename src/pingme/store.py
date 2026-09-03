@@ -97,6 +97,7 @@ def summary_row(run: dict) -> dict:
         "id": run["id"],
         "label": run.get("label"),
         "timestamp": run["timestamp"],
+        "duration_s": run["duration_s"],
         "isp": pub.get("isp"),
         "city": pub.get("city"),
         "country": pub.get("country"),

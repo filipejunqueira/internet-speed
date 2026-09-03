@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "type": "module",
+  "description": "The JavaScript the Python package publishes to the reports site. Tests: node --test tests/js/"
+}
