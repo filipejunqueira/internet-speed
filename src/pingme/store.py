@@ -61,6 +61,27 @@ def find_run(ref: str | None) -> dict | None:
     return None
 
 
+def is_silent(entry: dict) -> bool:
+    """Nothing came back and ping itself did not fail: the address ignores probes.
+
+    That is a setting on the device, not a fault on the line, so it must not be read
+    as total loss. Runs saved before this recorded it as the error "no replies".
+    """
+    if entry.get("silent") is not None:
+        return bool(entry["silent"])
+    return not entry["samples"] and entry.get("error") in (None, "no replies")
+
+
+def burst_probes(entry: dict) -> int | None:
+    """The longest run of consecutive losses, or None when there is none to count.
+
+    None covers both a run saved before bursts were counted and a target that never
+    answered. Zero means counted, and nothing was lost: the two must not look alike.
+    """
+    loss = entry.get("loss")
+    return None if loss is None else (loss.get("longest_burst_probes") or 0)
+
+
 def summary_row(run: dict) -> dict:
     """The one-line summary of a run: what `pingme list` shows and what the site index stores."""
     s = run["snapshot"]
@@ -68,10 +89,10 @@ def summary_row(run: dict) -> dict:
     speed = {x["direction"]: x["mbps"] for x in run["speed"]}
     targets = run["analysis"]["targets"]
     sp = targets.get("sao-paulo") or {}
-    # a target with no loss figure at all never answers; it must not win "worst loss"
+    # an address that never answers must not win "worst loss" with its 100 %
     measured = [t["all"]["loss_pct"] for t in targets.values()
-                if t["all"]["loss_pct"] is not None]
-    bursts = [(t.get("loss") or {}).get("longest_burst_probes") or 0 for t in targets.values()]
+                if t["all"]["loss_pct"] is not None and not is_silent(t)]
+    bursts = [b for b in (burst_probes(t) for t in targets.values()) if b is not None]
     return {
         "id": run["id"],
         "label": run.get("label"),
@@ -83,7 +104,7 @@ def summary_row(run: dict) -> dict:
         "download_mbps": speed.get("download", 0.0),
         "upload_mbps": speed.get("upload", 0.0),
         "worst_loss_pct": max(measured, default=None),
-        "worst_burst_probes": max(bursts, default=0),
+        "worst_burst_probes": max(bursts, default=None),
         "local_overhead_ms": run["analysis"]["local_overhead_ms"],
         "sao_paulo_p95_ms": (sp.get("all") or {}).get("p95_ms"),
         "sao_paulo_route": (sp.get("physics") or {}).get("most_consistent"),

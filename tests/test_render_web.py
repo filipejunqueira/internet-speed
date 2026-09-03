@@ -62,3 +62,28 @@ def test_a_single_lost_probe_is_not_a_green_tick():
     assert _loss_status(15, 1.0)[0] == "serious"
     assert _loss_status(75, 5.0)[0] == "critical"
     assert _loss_status(None, None)[0] == "muted"
+
+
+def test_a_run_saved_before_bursts_were_counted_does_not_claim_a_clean_one():
+    """The fixture predates burst counting: the tile must say so, not show a green 0."""
+    html = build_report(json.loads(FIXTURE.read_text()))
+    tile = html.split('<div class="label">longest burst</div>')[1][:220]
+    assert "not counted on this run" in tile
+    assert "badge good" not in tile
+
+
+def test_an_old_records_silent_hop_no_longer_wins_worst_loss():
+    """Runs saved before this marked a silent hop as the error "no replies" at 100 %."""
+    from pingme.store import summary_row
+
+    run = json.loads(FIXTURE.read_text())
+    hop = json.loads(json.dumps(run["analysis"]["targets"]["router"]))  # a deep copy
+    hop.update(samples=[], error="no replies")
+    for phase in ("all", "idle", "busy"):
+        hop[phase].update(received=0, loss_pct=100.0)
+    run["analysis"]["targets"]["isp-hop"] = hop
+
+    tile = build_report(run).split('<div class="label">worst packet loss</div>')[1][:150]
+    assert "100.0%" not in tile
+    assert summary_row(run)["worst_loss_pct"] != 100.0
+    assert summary_row(run)["worst_burst_probes"] is None

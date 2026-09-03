@@ -8,7 +8,7 @@ from rich.console import Console
 from . import __version__
 from .render_tui import render
 from .run import Timing, run
-from .store import find_run, load_runs, summary_row
+from .store import burst_probes, find_run, load_runs, summary_row
 
 app = typer.Typer(add_completion=False, invoke_without_command=True, no_args_is_help=False,
                   help="Measure, plot and log the quality of the current internet connection.")
@@ -74,10 +74,9 @@ def _metric(rec: dict, n: str, metric: str) -> str:
 
 
 def _burst(rec: dict, n: str) -> str:
-    """The longest run of consecutive lost probes; "—" for a run saved before we counted."""
-    e = rec["analysis"]["targets"].get(n) or {}
-    v = (e.get("loss") or {}).get("longest_burst_probes")
-    return "—" if not v else str(v)
+    """The longest run of consecutive lost probes; "—" when there is none to count."""
+    b = burst_probes(rec["analysis"]["targets"].get(n) or {})
+    return "—" if b is None else str(b)
 
 
 @app.command("list")
@@ -124,7 +123,7 @@ def compare(a: str, b: str):
     for n in names:
         for metric in ("loss_pct", "min_ms", "median_ms", "p95_ms", "jitter_ms"):
             row(f"{n} {metric}", _metric(ra, n, metric), _metric(rb, n, metric))
-        row(f"{n} longest burst probes", _burst(ra, n), _burst(rb, n))
+        row(f"{n} burst", _burst(ra, n), _burst(rb, n))
     console.print(t)
 
 

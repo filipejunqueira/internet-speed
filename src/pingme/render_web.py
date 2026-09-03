@@ -19,7 +19,7 @@ from plotly.offline import get_plotlyjs
 
 from .probe import INTERVAL_S
 from .render_map import map_figure, traced_path, traces_for
-from .store import data_dir
+from .store import burst_probes, data_dir, is_silent
 
 TARGET_ORDER = ["router", "isp-hop", "london", "madrid", "us-east", "sao-paulo"]
 
@@ -215,17 +215,6 @@ def _stats_table(entry: dict) -> str:
             f"</tr></thead><tbody>{rows}</tbody></table></details>")
 
 
-def is_silent(entry: dict) -> bool:
-    """Nothing came back and ping itself did not fail: the target ignores probes."""
-    if entry.get("silent") is not None:
-        return bool(entry["silent"])
-    return not entry["samples"] and entry.get("error") in (None, "no replies")  # older runs
-
-
-def burst_probes(entry: dict) -> int:
-    return (entry.get("loss") or {}).get("longest_burst_probes") or 0
-
-
 def _target_section(name: str, entry: dict, marks: dict, i: int,
                     trace_entry: dict | None = None) -> str:
     a = entry["all"]
@@ -240,7 +229,7 @@ def _target_section(name: str, entry: dict, marks: dict, i: int,
     facts = [f"loss {_fmt(a['loss_pct'], 1, '%')}"]
     if lost is not None:
         facts[0] += f" ({lost:,} of {a['sent']:,} probes)"
-    burst = burst_probes(entry)
+    burst = burst_probes(entry) or 0
     if burst:
         loss = entry["loss"]
         badge = _status(burst, BURST_WARN, BURST_CRIT)
@@ -380,10 +369,12 @@ def build_report(run: dict, traces: dict | None = None, *,
     targets = a["targets"]
     order = sorted(targets, key=lambda n: TARGET_ORDER.index(n) if n in TARGET_ORDER else 99)
     speeds = {x["direction"]: x for x in run["speed"]}
-    measured = [t for t in targets.values() if t["all"]["loss_pct"] is not None]
+    measured = [t for t in targets.values()
+                if t["all"]["loss_pct"] is not None and not is_silent(t)]
     worst_loss = max((t["all"]["loss_pct"] for t in measured), default=None)
     lost_total = sum(t["all"]["sent"] - t["all"]["received"] for t in measured)
-    worst_burst = max((burst_probes(t) for t in targets.values()), default=0)
+    counted = [b for b in (burst_probes(t) for t in targets.values()) if b is not None]
+    worst_burst = max(counted, default=None)
     sp_phys = (targets.get("sao-paulo") or {}).get("physics") or {}
 
     if s.get("medium") == "wifi" and s.get("wifi"):
@@ -411,7 +402,10 @@ def build_report(run: dict, traces: dict | None = None, *,
         _tile("worst packet loss", _fmt(worst_loss, 1, "%"),
               f"{lost_total:,} probes lost across all targets",
               _loss_status(lost_total, worst_loss)),
-        _tile("longest burst", f"{worst_burst} <small>probes</small>",
+        _tile("longest burst",
+              "—" if worst_burst is None else f"{worst_burst} <small>probes</small>",
+              "not counted on this run"
+              if worst_burst is None else
               f"{worst_burst * INTERVAL_S:.1f} s in a row, worst target",
               _status(worst_burst, BURST_WARN, BURST_CRIT)),
         _tile("local overhead", f"{a['local_overhead_ms']:.0f} <small>ms</small>",

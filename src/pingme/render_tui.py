@@ -9,6 +9,8 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from .store import burst_probes, is_silent
+
 TARGET_ORDER = ["router", "isp-hop", "london", "madrid", "us-east", "sao-paulo"]
 
 
@@ -59,15 +61,10 @@ def _timeline(entry: dict, width: int, height: int) -> Text:
     return _plot_to_text(width, height, draw)
 
 
-def _is_silent(entry: dict) -> bool:
-    """Nothing came back and ping itself did not fail: the target ignores probes."""
-    if entry.get("silent") is not None:
-        return bool(entry["silent"])
-    return not entry["samples"] and entry.get("error") in (None, "no replies")  # older runs
-
-
 def _burst_text(entry: dict) -> str:
-    loss = entry.get("loss")
+    if "loss" not in entry:
+        return "burst not counted"  # a run saved before bursts were measured
+    loss = entry["loss"]
     if not loss or not loss["longest_burst_probes"]:
         return "burst —"
     return (f"burst [bold]{loss['longest_burst_probes']}[/bold] probes "
@@ -98,7 +95,7 @@ def _target_panel(name: str, entry: dict, width: int, trace_entry: dict | None =
         p = entry["physics"]
         head += (f"   timing estimate: ~{_fmt(p['effective_ms'], '', 0)} ms after local overhead → "
                  f"[bold]{p['most_consistent'] or 'faster than any known route?'}[/bold]")
-    if _is_silent(entry):
+    if is_silent(entry):
         return Panel(Text(f"{name}  {entry['ip']}  — does not answer probes "
                           f"({a['sent']} sent, 0 back)", style="dim"), border_style="grey50")
     if entry.get("error") and not entry["samples"]:
@@ -166,8 +163,10 @@ def _verdict_table(run: dict) -> Table:
         e = targets[name]
         a, b = e["all"], e["busy"]
         verdict = (e.get("physics") or {}).get("most_consistent") or ""
-        burst = (e.get("loss") or {}).get("longest_burst_probes")
-        t.add_row(name, _fmt(a["loss_pct"], "%"), "—" if not burst else str(burst),
+        # "—" means nobody counted; a measured run with nothing lost says 0
+        b = burst_probes(e)
+        burst = "—" if b is None else str(b)
+        t.add_row(name, _fmt(a["loss_pct"], "%"), burst,
                   _fmt(a["min_ms"]), _fmt(a["median_ms"]),
                   _fmt(a["p95_ms"]), _fmt(a["p99_ms"]), _fmt(a["jitter_ms"]),
                   _fmt(b["p95_ms"]), verdict)

@@ -69,3 +69,33 @@ def test_ping_runs_without_a_deadline_so_the_last_probe_is_not_written_off():
     assert cmd[cmd.index("-W") + 1] == "2"
     assert cmd[cmd.index("-c") + 1] == "150"
     assert probe_count(30.0) == 150 and probe_count(0.05) == 1
+
+
+def test_read_takes_the_sent_count_from_pings_summary_not_the_last_reply():
+    """Two probes went out after the last reply came back; both must count as sent."""
+    import asyncio
+    import time
+
+    from pingme.probe import Phase, ProbeResult, _read
+
+    transcript = (
+        "PING 1.1.1.1 (1.1.1.1) 56(84) bytes of data.\n"
+        "64 bytes from 1.1.1.1: icmp_seq=1 ttl=54 time=10.0 ms\n"
+        "64 bytes from 1.1.1.1: icmp_seq=2 ttl=54 time=11.0 ms\n"
+        "64 bytes from 1.1.1.1: icmp_seq=4 ttl=54 time=12.0 ms\n"
+        "\n--- 1.1.1.1 ping statistics ---\n"
+        "6 packets transmitted, 3 received, 50% packet loss, time 1200ms\n"
+    )
+
+    async def read_it() -> ProbeResult:
+        stream = asyncio.StreamReader()
+        stream.feed_data(transcript.encode())
+        stream.feed_eof()
+        result = ProbeResult(target="t", ip="1.1.1.1")
+        await _read(stream, Phase(), time.monotonic(), result)
+        return result
+
+    r = asyncio.run(read_it())
+    assert r.sent == 6, "the highest sequence number back was 4; ping said it sent 6"
+    assert [s.seq for s in r.samples] == [1, 2, 4]
+    assert all(s.phase == "idle" for s in r.samples)
