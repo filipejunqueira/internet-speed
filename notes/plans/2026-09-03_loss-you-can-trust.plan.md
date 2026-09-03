@@ -245,6 +245,23 @@ deadline, with `ping_command` pulled out so a test can hold the line.
 - Tick every item in `PLAN.md`, then archive it under `notes/plans/` with today's date
   like the previous one.
 
+## After the plan was finished
+
+A review of the completed work found one more of the same kind of mistake and two
+gaps, fixed in commit 38f79ba:
+
+- The burst tile showed a green 0 on runs saved before bursts were counted. Missing
+  and zero must not look alike. Both now read "—" against 0. The same distinction
+  stopped the silent ISP hop in already-published runs from winning the worst-loss
+  tile with its stored 100 %: the report for `leeds_bt_2026-08-30T15-32-20Z` now
+  reads 0.7 %, its real worst.
+- The rules for "silent address" and "longest burst" had four copies across the
+  renderers. They live once in `store.py` now.
+- `_read`, which the whole exact-sent-count claim rests on, had no test. It now reads
+  a canned ping transcript where two probes go out after the last reply. `pingme
+  compare` had been changed without being run once; running it showed the burst row
+  label wrapping onto two lines.
+
 ## Review notes: what the code review found beyond the two decisions
 
 Kept here so the findings survive even if they are not acted on now.

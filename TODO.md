@@ -43,7 +43,9 @@ Last updated: 2026-09-03
   the busy probes; each probe now belongs to exactly one phase. A target that never
   answers reads as silent instead of 100 % loss. Every target reports its longest
   burst of consecutive losses, drawn on both timelines. Any lost probe at all now
-  fails the green badge. 13 tests added, 35 in total.
+  fails the green badge, and a figure nobody measured shows "—" rather than a clean
+  zero, which also stopped the silent hop in already-published runs from winning the
+  worst-loss tile at 100 %. 16 tests added, 38 in total.
 - 2026-08-31 — Packet loss counted from probe sequence numbers. The clock estimate invented ~0.3 % loss on every target; the BT line really lost 1 packet in 1,495.
 - 2026-08-30 — `pingme` installed on PATH; first full 60 s run published from the user's terminal: https://filipejunqueira.github.io/internet-speed-reports/runs/leeds_bt_2026-08-30T15-32-20Z.html
 - 2026-08-30 — Phase 2 done: `pingme publish` / `--publish` to GitHub Pages with redaction, self-hosted plotly.js, run-time traces saved in the record, traced city path in reports. Review findings fixed.
