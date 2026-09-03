@@ -4,10 +4,10 @@ Last updated: 2026-09-03
 
 ## Now
 
-- [ ] Run explorer on GitHub Pages → PLAN.md (draft, awaiting approval 2026-09-03):
-      one page listing every published run; tick one to read it, two or three to compare
-      with one colour per run, map included. Mockup:
-      https://claude.ai/code/artifact/fe5fdc5f-b0ca-44ba-a503-9f36f3822dec
+- [ ] Publish from your own terminal to put the explorer live, and open the site to check
+      it (see PLAN.md step 5). It has to be your terminal: the container's run log holds
+      different runs, so a publish from there would leave your two published runs without
+      their data
 
 ## Next
 
@@ -38,6 +38,15 @@ Last updated: 2026-09-03
 - [ ] Scheduled background runs
 
 ## Done
+
+- 2026-09-03 — The reports site became one page. It publishes `runs/<id>.json` beside each
+  report and backfills the runs already listed, so ticking a run in the table opens it and
+  ticking two or three compares them on shared axes, one colour per run, map included.
+  Six JavaScript modules under `src/pingme/site/`, 131 node tests inside the pytest gate.
+  Built and reviewed by 24 agents; the audit found a stylesheet variable that was never
+  defined, which made the tick box invisible, and a y-axis capped at p99, which hid the
+  worst probes while the run's own page showed them.
+  Mockup of the three screens: https://claude.ai/code/artifact/fe5fdc5f-b0ca-44ba-a503-9f36f3822dec
 
 - 2026-09-03 — Loss you can trust. ping now sends an exact number of probes and waits
   for the last replies, so nothing is invented and nothing at the end is missed; the

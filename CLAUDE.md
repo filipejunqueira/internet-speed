@@ -7,7 +7,9 @@
 router and Valve's Dota relays in London, Madrid, US-East and São Paulo, draws the
 results in the terminal, and appends every run to a log. `pingme --web` adds an
 HTML report with the same charts, the statistics as tables, and a traced route map;
-`pingme --publish` puts a redacted copy on GitHub Pages.
+`pingme --publish` puts a redacted copy on GitHub Pages, where one page lists every
+published run: tick one to read its report, two or three to compare them on shared
+axes with one colour per run, route map included.
 
 Packet loss is counted from ping's own sent count and the sequence numbers that
 come back, so a gap is real loss and a probe lost at the end of a run is not
@@ -31,7 +33,9 @@ counted; direction: `TODO.md`.
 - publish to GitHub Pages: `uv run pingme --label <name> --publish`, or `uv run pingme publish [id]`
   (redacts IP and SSID by default; `--no-redact` to keep them; `--no-map` skips the map).
   Site: https://filipejunqueira.github.io/internet-speed-reports/
-- test all: `uv run pytest`; test one: `uv run pytest -k <name>`
+- test all: `uv run pytest`; test one: `uv run pytest -k <name>`. That includes the site's
+  JavaScript: `tests/test_explorer_js.py` runs `node --test`, and skips with a reason when
+  node is missing. On its own: `node --test "tests/js/*.test.js"`
 - lint: `uv run ruff check .`
 - put `pingme` on PATH (user's own terminal, not the container): `uv tool install --editable .`
 
@@ -45,9 +49,17 @@ they are wired in.
 ## Structure
 
 - `src/pingme/` — one module per concern; `run.py` orchestrates, `cli.py` is typer.
+- `src/pingme/site/` — the published page's JavaScript, six ES modules copied to the
+  site's `assets/` on every publish. Five are pure and tested by `tests/js/`; only
+  `app.js` touches the DOM. Colours, target order and thresholds are not written here:
+  Python emits them into the page as a tokens block, so there is one source of truth.
 - `tests/fixtures/run.json` — a real saved run, trimmed; the web-report tests use it.
 - Runs go to `$XDG_DATA_HOME/pingme/runs.jsonl` (one JSON object per line);
   reports and maps next to it. Nothing measured is written inside the repo.
+- The site holds `runs/<id>.html` (the report) and `runs/<id>.json` (the redacted record
+  that drew it, which the explorer reads). Publishing backfills the JSON for runs already
+  listed on the site, and only for those: a run in the private log that was never
+  published must not reach the site as a side effect of publishing another.
 - `notes/reports/` — hand-copied reports for review, git-ignored.
 - `PINGME_OVERRIDE="sao-paulo=192.0.2.1"` swaps a target's address (failure tests).
 
@@ -77,4 +89,6 @@ they are wired in.
   codebase is not ruff-formatted (it uses hanging indents), so that would rewrite about
   993 lines across `src/pingme/`. Make Python edits through the shell instead, then run
   `uv run ruff check .`, which is the project's actual gate (2026-09-03).
+- `node --test tests/js/` does not walk a directory on node 26: it tries to load the path as
+  a module and fails. Pass the glob, `node --test "tests/js/*.test.js"` (2026-09-03).
 - plotext 6 is a rewrite; the code targets 5.x, pinned `<6` (2026-08-29).
