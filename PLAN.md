@@ -168,7 +168,7 @@ Then in `run.analyse`:
   `silent=True` and `loss_pct is None` in all three summaries; a target with
   `error="ping not found"` is not silent.
 
-### [ ] Step 3: show it in the terminal (30 min)
+### [x] Step 3: show it in the terminal (30 min)
 
 File: `src/pingme/render_tui.py`.
 

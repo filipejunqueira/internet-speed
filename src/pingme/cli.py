@@ -73,6 +73,13 @@ def _metric(rec: dict, n: str, metric: str) -> str:
     return "—" if v is None else f"{v:.1f}"
 
 
+def _burst(rec: dict, n: str) -> str:
+    """The longest run of consecutive lost probes; "—" for a run saved before we counted."""
+    e = rec["analysis"]["targets"].get(n) or {}
+    v = (e.get("loss") or {}).get("longest_burst_probes")
+    return "—" if not v else str(v)
+
+
 @app.command("list")
 def list_runs():
     """List saved runs."""
@@ -117,6 +124,7 @@ def compare(a: str, b: str):
     for n in names:
         for metric in ("loss_pct", "min_ms", "median_ms", "p95_ms", "jitter_ms"):
             row(f"{n} {metric}", _metric(ra, n, metric), _metric(rb, n, metric))
+        row(f"{n} longest burst probes", _burst(ra, n), _burst(rb, n))
     console.print(t)
 
 

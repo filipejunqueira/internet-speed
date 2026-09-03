@@ -40,22 +40,45 @@ def _histogram(entry: dict, width: int, height: int) -> Text:
 
 
 def _timeline(entry: dict, width: int, height: int) -> Text:
+    lost = (entry.get("loss") or {}).get("lost") or []
+
     def draw():
         for phase, colour in (("idle", "cyan"), ("download", "orange"), ("upload", "red")):
             pts = [(s[2], s[1]) for s in entry["samples"] if s[3] == phase]
             if pts:
                 plt.scatter([p[0] for p in pts], [p[1] for p in pts], label=phase,
                             color=colour, marker="dot")
+        if lost:
+            # draw every lost probe along the top, where it cannot hide among the replies
+            top = max(s[1] for s in entry["samples"])
+            plt.scatter([t for _, t in lost], [top] * len(lost), label="lost",
+                        color="red", marker="x")
         plt.xlabel("seconds")
         plt.title("round trip over time")
 
     return _plot_to_text(width, height, draw)
 
 
+def _is_silent(entry: dict) -> bool:
+    """Nothing came back and ping itself did not fail: the target ignores probes."""
+    if entry.get("silent") is not None:
+        return bool(entry["silent"])
+    return not entry["samples"] and entry.get("error") in (None, "no replies")  # older runs
+
+
+def _burst_text(entry: dict) -> str:
+    loss = entry.get("loss")
+    if not loss or not loss["longest_burst_probes"]:
+        return "burst —"
+    return (f"burst [bold]{loss['longest_burst_probes']}[/bold] probes "
+            f"({loss['longest_burst_s']:.1f} s at {loss['longest_burst_at_s']:.0f} s)")
+
+
 def _target_panel(name: str, entry: dict, width: int, trace_entry: dict | None = None) -> Panel:
     a, idle, busy = entry["all"], entry["idle"], entry["busy"]
     head = (f"[bold]{name}[/bold]  {entry['ip']}   "
-            f"loss [bold]{_fmt(a['loss_pct'], '%')}[/bold]  "
+            f"loss [bold]{_fmt(a['loss_pct'], '%')}[/bold] "
+            f"({a['sent'] - a['received']} of {a['sent']})  {_burst_text(entry)}  "
             f"best {_fmt(a['min_ms'])}  median {_fmt(a['median_ms'])}  "
             f"p95 {_fmt(a['p95_ms'])}  p99 {_fmt(a['p99_ms'])}  jitter {_fmt(a['jitter_ms'])} ms")
     if idle["median_ms"] is not None and busy["median_ms"] is not None:
@@ -75,6 +98,9 @@ def _target_panel(name: str, entry: dict, width: int, trace_entry: dict | None =
         p = entry["physics"]
         head += (f"   timing estimate: ~{_fmt(p['effective_ms'], '', 0)} ms after local overhead → "
                  f"[bold]{p['most_consistent'] or 'faster than any known route?'}[/bold]")
+    if _is_silent(entry):
+        return Panel(Text(f"{name}  {entry['ip']}  — does not answer probes "
+                          f"({a['sent']} sent, 0 back)", style="dim"), border_style="grey50")
     if entry.get("error") and not entry["samples"]:
         return Panel(Text(f"{name}  {entry['ip']}  — {entry['error']}", style="red"),
                      border_style="red")
@@ -132,14 +158,17 @@ def _speed_panel(run: dict, width: int) -> Panel:
 
 def _verdict_table(run: dict) -> Table:
     t = Table(title="summary", show_lines=False)
-    for col in ("target", "loss", "best", "median", "p95", "p99", "jitter", "busy p95", "route"):
+    for col in ("target", "loss", "burst", "best", "median", "p95", "p99", "jitter",
+                "busy p95", "route"):
         t.add_column(col, justify="right" if col != "target" and col != "route" else "left")
     targets = run["analysis"]["targets"]
     for name in sorted(targets, key=lambda n: TARGET_ORDER.index(n) if n in TARGET_ORDER else 99):
         e = targets[name]
         a, b = e["all"], e["busy"]
         verdict = (e.get("physics") or {}).get("most_consistent") or ""
-        t.add_row(name, _fmt(a["loss_pct"], "%"), _fmt(a["min_ms"]), _fmt(a["median_ms"]),
+        burst = (e.get("loss") or {}).get("longest_burst_probes")
+        t.add_row(name, _fmt(a["loss_pct"], "%"), "—" if not burst else str(burst),
+                  _fmt(a["min_ms"]), _fmt(a["median_ms"]),
                   _fmt(a["p95_ms"]), _fmt(a["p99_ms"]), _fmt(a["jitter_ms"]),
                   _fmt(b["p95_ms"]), verdict)
     return t
