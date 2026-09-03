@@ -16,8 +16,9 @@ back, which is what a game actually feels. An address that never answers at all,
 like the ISP hop on BT, is reported as silent with its sent count, not as 100 %
 loss. Note the limit: these are ICMP probes, not game traffic. Routers drop
 ICMP first under load, so this can show loss a game would never feel.
-Design and evidence: `notes/plans/2026-08-31_pingme-v1-and-pages.plan.md`;
-direction: `TODO.md`.
+Design and evidence: `notes/plans/2026-08-31_pingme-v1-and-pages.plan.md` for v1 and
+publishing, `notes/plans/2026-09-03_loss-you-can-trust.plan.md` for how loss is
+counted; direction: `TODO.md`.
 
 ## Commands
 
