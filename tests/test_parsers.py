@@ -58,3 +58,14 @@ def test_send_offset_recovers_pings_fixed_schedule():
     assert abs(send_offset(samples) - offset) < 1e-9
     assert abs(send_time(4, offset) - (offset + 0.6)) < 1e-9
     assert send_offset([]) == 0.0
+
+
+def test_ping_runs_without_a_deadline_so_the_last_probe_is_not_written_off():
+    """-c with -w means "until N are answered", which loses the probe still in flight."""
+    from pingme.probe import ping_command, probe_count
+
+    cmd = ping_command("/usr/bin/ping", "1.1.1.1", 30.0)
+    assert "-w" not in cmd, "a deadline turns the last in-flight probe into phantom loss"
+    assert cmd[cmd.index("-W") + 1] == "2"
+    assert cmd[cmd.index("-c") + 1] == "150"
+    assert probe_count(30.0) == 150 and probe_count(0.05) == 1

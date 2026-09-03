@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 REPLY_RE = re.compile(r"icmp_seq=(\d+).*?time=([\d.]+)\s*ms")
 SUMMARY_RE = re.compile(r"(\d+) packets transmitted")
 INTERVAL_S = 0.2  # smallest interval allowed without root
-GRACE_S = 2  # extra seconds for ping to collect the replies to its last probes
+REPLY_WAIT_S = 2  # how long ping waits for the last replies once it has sent everything
 
 
 @dataclass
@@ -64,6 +64,24 @@ def send_offset(samples: list[Sample]) -> float:
 def send_time(seq: int, offset: float) -> float:
     """When probe `seq` left, in seconds since the run started."""
     return offset + (seq - 1) * INTERVAL_S
+
+
+def probe_count(duration: float) -> int:
+    """How many probes a run of this length sends to each target."""
+    return max(1, int(duration / INTERVAL_S))
+
+
+def ping_command(exe: str, ip: str, duration: float) -> list[str]:
+    """The ping to run for one target.
+
+    -c on its own means "send exactly this many, then wait for the replies still on
+    their way". Do not add -w: with a deadline, -c instead means "until this many are
+    answered", and ping abandons the probe still in flight. Sao Paulo answers in 210 ms
+    while probes leave every 200 ms, so one is always in flight, and a run that lost
+    nothing reported 0.7 % loss. Checked both ways on 2026-09-03.
+    """
+    return [exe, "-n", "-c", str(probe_count(duration)), "-i", str(INTERVAL_S),
+            "-W", str(REPLY_WAIT_S), ip]
 
 
 class Phase:
@@ -127,14 +145,8 @@ async def _ping_one(target: str, ip: str, duration: float, phase: Phase,
     if exe is None:
         result.error = "ping not found"
         return
-    count = max(1, int(duration / INTERVAL_S))
-    # -c is how many replies we want, not how many probes go out: alongside -w, ping
-    # keeps sending until `count` probes are answered or the deadline passes (checked
-    # 2026-09-03). A clean line therefore stops on time, and a lossy one keeps probing
-    # into the GRACE_S tail rather than cutting its last probe short and calling it
-    # loss. Either way the summary line says exactly how many probes went out.
-    cmd = [exe, "-n", "-c", str(count), "-i", str(INTERVAL_S),
-           "-w", str(int(duration) + GRACE_S), ip]
+    count = probe_count(duration)
+    cmd = ping_command(exe, ip, duration)
     try:
         proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE,
                                                     stderr=asyncio.subprocess.PIPE)
@@ -144,7 +156,7 @@ async def _ping_one(target: str, ip: str, duration: float, phase: Phase,
     assert proc.stdout is not None
     try:
         await asyncio.wait_for(_read(proc.stdout, phase, t0, result),
-                               timeout=duration + GRACE_S + 5)
+                               timeout=duration + REPLY_WAIT_S + 5)
     except TimeoutError:
         result.error = "ping did not finish in time"
     finally:

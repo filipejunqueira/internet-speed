@@ -212,7 +212,16 @@ Files: `src/pingme/render_web.py`, `src/pingme/store.py`, `src/pingme/publish.py
   trace, the text `does not answer probes`, and no `critical` loss badge for the
   silent one. Keep the determinism test.
 
-### [ ] Step 5: real run and report (15 min)
+### [x] Step 5: real run and report (15 min)
+
+Done 2026-09-03. The first real run failed its own criterion and was worth the
+whole step: Sao Paulo reported 0.7 % loss with the missing probe at the very last
+second. `-c` alongside `-w` means "until N are answered", so ping walked away from
+the probe still in flight, and Sao Paulo always has one in flight because it answers
+in 210 ms while probes leave every 200 ms. Checked directly: `-c 10 -w 4` reports
+"11 packets transmitted, 10 received, 9.09 % packet loss" where `-c 10 -W 2` reports
+"10 packets transmitted, 10 received, 0 %", in the same 2 s. The fix is `-W` and no
+deadline, with `ping_command` pulled out so a test can hold the line.
 
 - `uv run ruff check .` and `uv run pytest`.
 - `uv run pingme --quick --label container_check` in the container; paste the target
