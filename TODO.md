@@ -4,11 +4,7 @@ Last updated: 2026-09-03
 
 ## Now
 
-- [ ] pingme as an instrument for dota-brazil → PLAN.md (approved 2026-09-04, groups A
-      and B). Custom targets and the override defect, a schema version, --note, --trace,
-      then spikes with the router as witness and a same-network guard on compare.
-      Asked for by ~/code/vpn, which is read-only from here; the reply goes in
-      notes/reply-to-dota-brazil-2026-09-04.md when the work is done
+- [ ] Nothing. Pick the next item from Next.
 
 ## Next
 
@@ -18,6 +14,12 @@ Last updated: 2026-09-03
 - [ ] Probe over UDP to the relay's game ports, so loss matches what the game sees
 
 ## Later
+
+- [ ] `--busy SECONDS` for a longer speed test (vpn project's R6). Held back on purpose:
+      growing the default would make a new 10-minute run's under-load penalty
+      incomparable with every run already in the log. The default must not move.
+- [ ] UDP probes to the relays' game ports (their R7): read Valve's GameNetworkingSockets
+      relay-ping code first and write the finding; build only if the relays answer
 
 - [ ] Physics route floors are too coarse near 190 ms (Madrid-side cable vs via USA); add candidate cables landing in Spain/Portugal, or drop the estimate when hops are visible
 - [ ] Doubtful hop geolocation (RIPE IPmap put a Telefónica router in Saint Petersburg); show a confidence or prefer hostname codes
@@ -39,6 +41,25 @@ Last updated: 2026-09-03
 - [ ] Scheduled background runs
 
 ## Done
+
+- 2026-09-04 — pingme became an instrument for the vpn project's dota-brazil work
+  (commit bee8f86, record schema 1). `--target NAME=IP` adds a target for one run,
+  measured and traced but never placed on the map, which also fixes a defect: an
+  overridden slot kept the coordinates of the target it replaced, so pointing the unused
+  Madrid slot at a London node collapsed the local overhead to zero and made every
+  physics verdict in that run wrong without a word of warning. Every target now reports
+  its spikes, the episodes they form, and how many land within a second of a router
+  spike; on the Santander run three quarters of London's spikes sit inside a router
+  stall, so the wifi link is stalling and everything inherits it. Also `--note` stored as
+  typed and redacted on publish, `--trace` without a report, a schema integer and
+  `notes/record-schema.md`, the busy probe count beside the under-load penalty, and a
+  same-network warning with a change column on `compare`. Reply to the asking project:
+  `notes/reply-to-dota-brazil-2026-09-04.md`.
+- 2026-09-04 — Two things about the two tools that neither project had written down: they
+  agree on loss (both take ping's own transmitted count), and they are not pinging the
+  same machine — pingme takes the first relay Valve lists for a city while `dota-lat`
+  pings three and keeps the best, which is the only possible cause of a few ms of
+  unexplained difference between them. Left for the vpn side to decide; it is in the reply.
 
 - 2026-09-03 — The reports site became one page. It publishes `runs/<id>.json` beside each
   report and backfills the runs already listed, so ticking a run in the table opens it and
