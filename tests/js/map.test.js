@@ -115,18 +115,20 @@ const LONDON_THEN_NOTHING = {
 test('the leg to the relay is dashed when the last hops never answered', () => {
   const { data } = mapFigure([run('a', LONDON_THEN_NOTHING)], 'sao-paulo', TOKENS)
   const legs = data.filter(t => t.mode === 'lines')
-  assert.equal(legs.length, 2) // you → London, London → the relay
+  // Two traces, not two legs: one holds every solid leg of this run, one every dashed leg.
+  // Here that is a leg each — you → London, then London → the relay.
+  assert.equal(legs.length, 2)
   assert.equal(legs[0].line.dash, 'solid')
   assert.equal(legs[1].line.dash, 'dash')
-  assert.match(legs[1].hovertext, /2 hidden hop/)
+  assert.match(legs[1].hovertext[0], /2 hidden hop/)
   const end = legs[1].lat[1]
   assert.equal(end, -23.55) // the relay itself closes the route
 })
 
 test('your own router is the origin star, not a hop the route skipped', () => {
   // geo puts a private address at the origin, so hop 1 lands on the star and is dropped as
-  // a zero-length hop. Nothing was skipped, so the leg stays solid — the same picture the
-  // run page draws for this trace.
+  // a zero-length hop. Nothing was skipped, so both legs stay solid — the same picture the
+  // run page draws for this trace — and one trace carries the pair of them.
   const entry = {
     error: null,
     hops: [hop(1, '192.168.0.1', 1.1), hop(2, '81.2.3.4', 12.0)],
@@ -135,9 +137,13 @@ test('your own router is the origin star, not a hop the route skipped', () => {
   }
   const { data } = mapFigure([run('a', entry)], 'sao-paulo', TOKENS)
   const legs = data.filter(t => t.mode === 'lines')
+  assert.equal(legs.length, 1) // nothing is a guess here, so no dashed trace is pushed at all
   assert.equal(legs[0].line.dash, 'solid')
-  assert.equal(legs[0].hovertext, 'a') // the run name alone: no hidden-hop note
-  assert.equal(legs[1].line.dash, 'solid') // London → the relay, nothing skipped
+  // you → London, then London → the relay, with the null between them lifting the pen so
+  // the two legs never join into a line that was never measured.
+  assert.deepEqual(legs[0].lat, [53.8, 51.51, null, 51.51, -23.55, null])
+  // The run name alone on every leg: no hidden-hop note.
+  assert.deepEqual(legs[0].hovertext, ['a', 'a', '', 'a', 'a', ''])
 })
 
 test('the relay is not drawn twice when a hop already landed on it', () => {
@@ -148,6 +154,83 @@ test('the relay is not drawn twice when a hop already landed on it', () => {
   }
   const { data } = mapFigure([run('a', onTop)], 'sao-paulo', TOKENS)
   assert.equal(data.filter(t => t.mode === 'lines').length, 1)
+})
+
+test('each leg keeps its own hover sentence inside the trace it shares', () => {
+  // One dashed leg jumps a single hidden hop and the next jumps two. They sit in one trace
+  // now, so the hover text has to be an array indexed against the coordinates rather than
+  // one sentence for the whole line — and the null between two legs needs an entry of its
+  // own, or every leg after the first would show the sentence belonging to the one before.
+  const entry = {
+    error: null,
+    hops: [hop(1, null, null), hop(2, '81.2.3.4', 12.0), hop(3, null, null),
+      hop(4, null, null), hop(5, '62.1.1.1', 20.0), hop(6, '155.1.1.1', 210.0)],
+    locations: [
+      null,
+      place('81.2.3.4', 51.51, -0.13, 'London'),
+      null,
+      null,
+      place('62.1.1.1', 52.37, 4.9, 'Amsterdam'),
+      place('155.1.1.1', -23.55, -46.63, 'São Paulo')
+    ]
+  }
+  const { data } = mapFigure([run('a', entry)], 'sao-paulo', TOKENS)
+  const dashed = data.find(t => t.mode === 'lines' && t.line.dash === 'dash')
+  assert.deepEqual(dashed.lat, [53.8, 51.51, null, 51.51, 52.37, null])
+  assert.deepEqual(dashed.hovertext, ['a: 1 hidden hop(s)', 'a: 1 hidden hop(s)', '',
+    'a: 2 hidden hop(s)', 'a: 2 hidden hop(s)', ''])
+  assert.equal(dashed.connectgaps, false)
+  const solid = data.find(t => t.mode === 'lines' && t.line.dash === 'solid')
+  assert.deepEqual(solid.lat, [52.37, -23.55, null]) // Amsterdam → the relay, nothing hidden
+})
+
+test('a run whose every leg is a guess still gets one legend entry, and a dashed one', () => {
+  // Nothing between the origin and the relay could be placed, so this run has no solid leg
+  // and no empty solid trace is pushed for it. The legend swatch belongs to whichever trace
+  // holds the first leg, which keeps it dashed here exactly as it was when every leg had a
+  // trace to itself.
+  const nothingPlaced = {
+    error: null,
+    hops: [hop(1, null, null), hop(2, null, null)],
+    locations: [null, null]
+  }
+  const { data } = mapFigure([run('a', nothingPlaced), run('b', LONDON_THEN_NOTHING)],
+    'sao-paulo', TOKENS)
+  const mine = data.filter(t => t.mode === 'lines' && t.name === 'a')
+  assert.equal(mine.length, 1)
+  assert.equal(mine[0].line.dash, 'dash')
+  assert.deepEqual(data.filter(t => t.showlegend).map(t => [t.name, t.line.dash]),
+    [['a', 'dash'], ['b', 'solid']])
+})
+
+// A route of `hops` traceroute hops with every third one unplaceable, spread down a
+// meridian so no two land close enough to collapse into one point. Both the solid trace
+// and the dashed one end up with several legs to hold.
+function longRoute(hops) {
+  const walked = [], locations = []
+  for (let n = 1; n <= hops; n++) {
+    const hidden = n % 3 === 0
+    const ip = `81.2.${n}.1`
+    walked.push(hop(n, hidden ? null : ip, hidden ? null : n))
+    locations.push(hidden ? null : place(ip, 51 - n * 0.5, -0.13, `hop ${n}`))
+  }
+  return { error: null, hops: walked, locations }
+}
+
+test('the map costs a bounded number of traces however long the routes are', () => {
+  // The map used to emit one scattergeo trace per leg: 15 traces for the two runs labelled
+  // leeds_bt in the log drawn against Sao Paulo, and scattergeo is the most expensive type plotly
+  // has, rebuilt from scratch every time the target changes. Two line traces per run is the
+  // ceiling now — one for the solid legs, one for the dashed — so the count stops following
+  // the length of the route. Six hops and forty hops have to cost the same.
+  for (const hops of [6, 40]) {
+    const runs = [run('a', longRoute(hops)), run('b', longRoute(hops))]
+    const { data } = mapFigure(runs, 'sao-paulo', TOKENS)
+    const legs = data.filter(t => t.mode === 'lines')
+    assert.ok(legs.length <= 4, `${hops} hops: ${legs.length} line traces, ceiling is 4`)
+    // Four lines, two sets of points, the cable landings and the shared origin star.
+    assert.ok(data.length <= 8, `${hops} hops: ${data.length} traces, ceiling is 8`)
+  }
 })
 
 test('colour follows the run slot, not the position in the list', () => {

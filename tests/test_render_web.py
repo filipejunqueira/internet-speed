@@ -104,3 +104,25 @@ def test_the_report_shows_every_hop_and_what_it_adds():
     assert "edge.example.net" in html
     assert "+11.0" in html  # 12.0 ms at hop 3, on top of the 1.0 ms at hop 1
     assert "no reply" in html  # hop 2 keeps its place in the numbering
+
+
+def test_a_published_map_reads_the_world_from_the_site_not_a_cdn():
+    """A report page sits in runs/, one level under the copy of the world beside plotly.js."""
+    from pingme.render_web import PLOTLY_ASSET, _plot_config
+
+    run = json.loads(FIXTURE.read_text())
+    traces = {"london": {"error": None,
+                         "hops": [{"n": 1, "ip": "1.2.3.4", "avg_ms": 9.0, "loss_pct": 0.0}],
+                         "locations": [{"ip": "1.2.3.4", "lat": 51.5, "lon": -0.1,
+                                        "city": "London", "source": "ip-api",
+                                        "hostname": None}]}}
+    published = build_report(run, traces, plotly="external")
+    assert '"topojsonURL": "../assets/"' in published
+
+    # A report written locally has no such copy beside it, and a map that does not draw is
+    # worse than a map that is slow, so that one is left pointing at plotly's own default.
+    # Quoted and followed by a colon: that is how the config is written into the page, and
+    # unlike the bare word it does not also appear inside the embedded plotly bundle.
+    assert '"topojsonURL":' not in build_report(run, traces)
+    assert _plot_config(None).get("topojsonURL") is None
+    assert _plot_config("../" + PLOTLY_ASSET)["topojsonURL"] == "../assets/"

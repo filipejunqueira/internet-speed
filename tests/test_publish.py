@@ -3,13 +3,15 @@ import re
 import subprocess
 from pathlib import Path
 
+import httpx
 import pytest
 
 from pingme import publish as pub
-from pingme.render_web import PLOTLY_ASSET, build_report, redact
+from pingme.render_web import PLOTLY_ASSET, TOPOJSON_ASSET, build_report, redact
 from pingme.store import summary_row
 
 FIXTURE = Path(__file__).parent / "fixtures" / "run.json"
+WORLD = '{"type":"Topology","objects":{}}'  # stands in for plotly's 136 KB world map
 
 
 def _run() -> dict:
@@ -18,7 +20,11 @@ def _run() -> dict:
 
 @pytest.fixture
 def site(tmp_path, monkeypatch):
-    """Data dir under tmp, a copy of the fixture as the private log, and git stubbed out."""
+    """Data dir under tmp, the fixture as the private log, and git and the world map stubbed.
+
+    Every publish wants plotly's world map, so the download is replaced here for all of
+    these tests: no test in this file is allowed near the network.
+    """
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
     log = tmp_path / "pingme" / "runs.jsonl"
     log.parent.mkdir(parents=True)
@@ -32,7 +38,13 @@ def site(tmp_path, monkeypatch):
         return subprocess.CompletedProcess(cmd, 0, stdout="M index.html\n", stderr="")
 
     monkeypatch.setattr(pub.subprocess, "run", fake_git)
-    return {"dir": site_dir, "log": log, "git": calls}
+    fetches = []
+    def fake_fetch():
+        fetches.append(pub.TOPOJSON_URL)
+        return WORLD
+
+    monkeypatch.setattr(pub, "fetch_topojson", fake_fetch)
+    return {"dir": site_dir, "log": log, "git": calls, "fetches": fetches}
 
 
 def test_publish_never_touches_the_private_log(site):
@@ -172,7 +184,7 @@ def test_the_tokens_block_carries_three_run_slots_and_every_key(site):
     pub.publish(_run(), with_map=False)
     tokens = _tokens((site["dir"] / "index.html").read_text())
     assert set(tokens) == {"runSlots", "chrome", "status", "targetOrder", "thresholds",
-                           "intervalS", "maxRuns", "font"}
+                           "intervalS", "maxRuns", "font", "topojsonUrl"}
     # three is the cap because a fourth hue fails the colour-blindness check on the map
     assert len(tokens["runSlots"]["light"]) == len(tokens["runSlots"]["dark"]) == 3
     assert tokens["maxRuns"] == 3
@@ -182,3 +194,42 @@ def test_the_tokens_block_carries_three_run_slots_and_every_key(site):
     assert set(tokens["thresholds"]) == {"lossWarn", "lossCrit", "penaltyWarn", "penaltyCrit",
                                          "burstWarn", "burstCrit"}
     assert tokens["intervalS"] == 0.2
+
+
+def test_publish_vendors_the_world_map_and_points_the_page_at_it(site):
+    """The map's topology comes off the site, not cdn.plot.ly, from the very first publish.
+
+    Written once, like the plotly bundle beside it: publishing twice downloads once. The
+    file name is plotly's own: it builds it from the map's scope and resolution, so the
+    join is worked out here rather than left to the page to discover at load time.
+    """
+    pub.publish(_run(), with_map=False)
+    world = site["dir"] / TOPOJSON_ASSET
+    assert world.read_text() == WORLD
+    tokens = _tokens((site["dir"] / "index.html").read_text())
+    # the check that matters is the join, not the string: plotly asks for
+    # topojsonUrl + the map's name + ".json", so that has to land on a real file
+    asked_for = tokens["topojsonUrl"] + "world_110m" + ".json"
+    assert (site["dir"] / asked_for).exists(), asked_for
+
+    pub.publish(_run(), with_map=False)
+    assert site["fetches"] == [pub.TOPOJSON_URL], "the world map was downloaded again"
+
+
+def test_a_world_map_that_will_not_download_still_publishes(site, monkeypatch):
+    """The map is a nicety; a publish that fails because of it would not be."""
+    def no_network():
+        raise httpx.ConnectError("no route to host")
+
+    monkeypatch.setattr(pub, "fetch_topojson", no_network)
+    said = []
+
+    url = pub.publish(_run(), status=said.append, with_map=False)
+
+    assert url == pub.PAGE_BASE + "runs/smoke_2026-08-29T21-02-51Z.html"
+    assert not (site["dir"] / TOPOJSON_ASSET).exists()
+    index = (site["dir"] / "index.html").read_text()
+    # no file on the site means no url in the tokens: the page falls back to plotly's CDN
+    assert _tokens(index)["topojsonUrl"] is None
+    assert f'<script src="{PLOTLY_ASSET}"></script>' in index
+    assert any("world map" in msg for msg in said), said

@@ -367,6 +367,16 @@ test('the small cards say their piece', () => {
     '<section class="card"><h2>Round trip over time</h2><div id="x"></div></section>')
 })
 
+test('a card heading takes an id when the page has to rewrite it later', () => {
+  // The cards whose titles name the chosen target are edited in place when the reader picks
+  // another one, rather than being built again, because rebuilding the card would throw
+  // away the plotly figure standing inside it.
+  assert.equal(chartCard('The route to São Paulo', '<div id="fig-map"></div>', 'head-map'),
+    '<section class="card"><h2 id="head-map">The route to São Paulo</h2>' +
+    '<div id="fig-map"></div></section>')
+  assert.ok(!chartCard('No id here', '').includes('id='), 'and nothing changes without one')
+})
+
 test('target names are written the way a person would write them', () => {
   assert.equal(prettyTarget('sao-paulo'), 'São Paulo')
   assert.equal(prettyTarget('us-east'), 'US-East')

@@ -3,8 +3,9 @@
 The site is a clone of `internet-speed-reports` under the data directory: `index.html`
 at the root, `runs/index.json` (newest first), and per run both `runs/<id>.html`, the
 finished report, and `runs/<id>.json`, the numbers behind it so the explorer page can
-compare runs. `assets/` holds plotly and the explorer's own JavaScript. The private log
-`runs.jsonl` is only ever read here, never written.
+compare runs. `assets/` holds plotly, the world map its geographic charts are drawn on,
+and the explorer's own JavaScript. The private log `runs.jsonl` is only ever read here,
+never written.
 """
 
 from __future__ import annotations
@@ -14,15 +15,41 @@ import subprocess
 from importlib.resources import files
 from pathlib import Path
 
+import httpx
 from plotly.offline import get_plotlyjs
 
 from .render_map import traces_for
-from .render_web import PLOTLY_ASSET, _css, build_report, explorer_css, explorer_tokens
+from .render_web import (
+    PLOTLY_ASSET,
+    TOPOJSON_ASSET,
+    _css,
+    build_report,
+    explorer_css,
+    explorer_tokens,
+)
 from .render_web import redact as redact_run
 from .store import data_dir, load_runs, summary_row
 
 REPO_URL = "git@github.com:filipejunqueira/internet-speed-reports.git"
 PAGE_BASE = "https://filipejunqueira.github.io/internet-speed-reports/"
+TOPOJSON_URL = "https://cdn.plot.ly/un/world_110m.json"
+
+
+def fetch_topojson() -> str:
+    """Plotly's world map: the exact file every scattergeo asks its CDN for, 278 KB.
+
+    The address matters. This plotly.js defaults `topojsonURL` to `https://cdn.plot.ly/un/`
+    and builds the name as scope + resolution, so an unscoped map at the default resolution
+    fetches `un/world_110m.json`. The older `cdn.plot.ly/world_110m.json` is a different,
+    smaller file: serving that instead would quietly redraw the world's borders rather than
+    only move where they come from.
+
+    Its own function so that a test can put something else in its place rather than go
+    near the network.
+    """
+    r = httpx.get(TOPOJSON_URL, timeout=30)
+    r.raise_for_status()
+    return r.text
 
 
 def site_dir() -> Path:
@@ -81,7 +108,7 @@ def backfill_run_data(runs_dir: Path, rows: list[dict]) -> int:
     return written
 
 
-def build_index(rows: list[dict]) -> str:
+def build_index(rows: list[dict], site: Path | None = None) -> str:
     """index.html: the shell of the explorer. Its table and charts are built by assets/app.js.
 
     Python only frames the page here: the report stylesheet, the block of colours, target
@@ -89,8 +116,11 @@ def build_index(rows: list[dict]) -> str:
     and an empty `<main>` for it to fill. The heading stays outside `<main>` so that the
     script can replace everything inside it without wiping the title. The list of runs
     itself is fetched from `runs/index.json`, so publishing one run never re-renders a row.
+
+    `site` is passed through to `explorer_tokens()` only so that it can see whether the
+    world map is really on the site before telling the page to use it.
     """
-    tokens = json.dumps(explorer_tokens(), ensure_ascii=False)
+    tokens = json.dumps(explorer_tokens(site), ensure_ascii=False)
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>pingme — reports</title><style>{_css()}{explorer_css()}
@@ -127,6 +157,14 @@ def publish(run: dict, *, status=lambda msg: None, redact: bool = True,
     if not asset.exists():  # the exact plotly.js this plotly emits figures for, written once
         asset.parent.mkdir(exist_ok=True)
         asset.write_text(get_plotlyjs(), encoding="utf-8")
+    topo = site / TOPOJSON_ASSET
+    if not topo.exists():  # the world the map is drawn on, written once, same as plotly.js
+        topo.parent.mkdir(exist_ok=True)
+        try:
+            topo.write_text(fetch_topojson(), encoding="utf-8")
+        except Exception as e:  # noqa: BLE001 - the map falls back to the CDN, so carry on
+            status(f"could not download the world map ({type(e).__name__}); the map will "
+                   "load it from plotly's CDN, the way it does today")
     runs = site / "runs"
     runs.mkdir(exist_ok=True)
     site_files(site)
@@ -145,7 +183,7 @@ def publish(run: dict, *, status=lambda msg: None, redact: bool = True,
     if filled:
         status(f"filled in the numbers for {filled} run{'s' if filled != 1 else ''} "
                "already on the site")
-    (site / "index.html").write_text(build_index(rows), encoding="utf-8")
+    (site / "index.html").write_text(build_index(rows, site), encoding="utf-8")
 
     status("pushing to GitHub")
     subprocess.run(["git", "add", "-A"], cwd=site, check=True)

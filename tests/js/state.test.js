@@ -11,6 +11,7 @@ import {
   slotOf,
   sortRows,
   toggleRun,
+  whatChanged,
   writeState
 } from '../../src/pingme/site/state.js'
 
@@ -222,4 +223,68 @@ test('a shared link is capped by the palette the page was given, not by this mod
   assert.equal(readState('?runs=a,b,c,d,e', 'sao-paulo', 0).selected.length, 3, 'nonsense too')
   assert.deepEqual(readState('?runs=a,b,c,d', 'sao-paulo', 4).selected.map((s) => s.slot),
     [0, 1, 2, 3], 'slots stay packed from zero whatever the cap')
+})
+
+// ---- what a click actually changed --------------------------------------------------------
+//
+// This is what decides whether a click rebuilds the whole page below the picker or edits
+// the few parts of it that name the target. Getting it wrong either leaves a stale chart on
+// screen or throws away seven live plotly figures for nothing.
+
+test('nothing moved, so nothing is redrawn', () => {
+  const state = tickAll(emptyState(DEFAULT_TARGET), ['a', 'b'])
+  assert.equal(whatChanged(state, state), 'none')
+  assert.equal(whatChanged(state, {...state, selected: [...state.selected]}), 'none',
+    'a fresh copy of the same ticks is still the same ticks')
+})
+
+test('sorting the picker changes nothing below it', () => {
+  const state = tickAll(emptyState(DEFAULT_TARGET), ['a', 'b'])
+  const sorted = {...state, sort: {key: 'p95', dir: 'asc'}}
+  assert.equal(whatChanged(state, sorted), 'none')
+})
+
+test('a different target on the same runs is a target change', () => {
+  const state = tickAll(emptyState(DEFAULT_TARGET), ['a', 'b'])
+  assert.equal(whatChanged(state, {...state, target: 'london'}), 'target')
+  // And still only a target change when the picker was re-sorted in the same breath.
+  assert.equal(whatChanged(state, {...state, target: 'london', sort: {key: 'p95', dir: 'asc'}}),
+    'target')
+})
+
+test('a tick, an untick or a second run is a structure change', () => {
+  const one = tickAll(emptyState(DEFAULT_TARGET), ['a'])
+  const two = toggleRun(one, 'b', MAX_RUNS).state
+  assert.equal(whatChanged(one, two), 'structure', 'one run to two')
+  assert.equal(whatChanged(two, one), 'structure', 'and back again')
+  assert.equal(whatChanged(two, toggleRun(two, 'c', MAX_RUNS).state), 'structure', 'a third')
+})
+
+test('swapping the one ticked run for another is a structure change', () => {
+  // Both states show a single run, so the view kind is the same, but the frame below the
+  // picker is that run's own report page and it has to be swapped for the other one.
+  const a = tickAll(emptyState(DEFAULT_TARGET), ['a'])
+  const b = tickAll(emptyState(DEFAULT_TARGET), ['b'])
+  assert.equal(whatChanged(a, b), 'structure')
+})
+
+test('the same two runs in the other order, wearing each other colours, is structural', () => {
+  // The set of ticked ids has not changed, but a and b have swapped slots, and the slot is
+  // the colour every chart below draws that run in. Nothing may be reused.
+  const state = tickAll(emptyState(DEFAULT_TARGET), ['a', 'b'])
+  const swapped = {...state, selected: [{id: 'b', slot: 0}, {id: 'a', slot: 1}]}
+  assert.deepEqual(selectedIds(swapped), ['b', 'a'])
+  assert.equal(whatChanged(state, swapped), 'structure')
+
+  // Unticking a run and ticking it straight back gives it the slot it had, so that pair of
+  // clicks really does leave the page where it started.
+  const retaken = tickAll(toggleRun(state, 'a', MAX_RUNS).state, ['a'])
+  assert.equal(slotOf(retaken, 'a'), 0)
+  assert.equal(whatChanged(state, retaken), 'none')
+})
+
+test('the first render has nothing on screen to keep', () => {
+  const state = tickAll(emptyState(DEFAULT_TARGET), ['a'])
+  assert.equal(whatChanged(null, state), 'structure')
+  assert.equal(whatChanged(state, null), 'structure')
 })

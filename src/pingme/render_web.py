@@ -11,6 +11,7 @@ import html
 import json
 import shutil
 import subprocess
+from pathlib import Path
 from typing import Literal
 
 import plotly.graph_objects as go
@@ -66,9 +67,28 @@ def _layout(title: str | None = None, height: int = 260, legend: bool = True) ->
             "hoverlabel": {"font": {"family": FONT}}}
 
 
-def _div(fig: go.Figure, div_id: str) -> str:
+def _div(fig: go.Figure, div_id: str, config: dict | None = None) -> str:
     return fig.to_html(full_html=False, include_plotlyjs=False, div_id=div_id,
-                       config=PLOT_CONFIG, default_height=fig.layout.height or 260)
+                       config=config or PLOT_CONFIG,
+                       default_height=fig.layout.height or 260)
+
+
+def _plot_config(plotly_src: str | None) -> dict:
+    """The plotly options for one page, and where its map should fetch the world from.
+
+    A published page sits in `runs/`, one level under the copy of the world the site keeps
+    beside plotly.js, so it can be told to read that instead of reaching out to
+    `cdn.plot.ly` for 278 KB every time somebody opens a report. A report written locally
+    has no such copy, so it is left pointing at the default: a page whose map does not draw
+    is worse than a page whose map is slow.
+    """
+    if not plotly_src:
+        return PLOT_CONFIG
+    prefix = plotly_src[: -len(PLOTLY_ASSET)] if plotly_src.endswith(PLOTLY_ASSET) else ""
+    if not prefix:
+        return PLOT_CONFIG
+    # plotly joins this with the map's own name: topojsonURL + "world_110m" + ".json".
+    return {**PLOT_CONFIG, "topojsonURL": prefix + "assets/"}
 
 
 def _phase_bands(fig: go.Figure, marks: dict) -> None:
@@ -382,7 +402,13 @@ main.loading{opacity:0.55;transition:opacity 120ms}
 """
 
 
-def explorer_tokens() -> dict:
+# plotly fetches its world map from cdn.plot.ly whenever a map is drawn: 278 KB over the
+# network on a page that otherwise needs none. publish() writes a copy here, beside the
+# plotly bundle, for the same reason the bundle is vendored at all.
+TOPOJSON_ASSET = "assets/world_110m.json"
+
+
+def explorer_tokens(site: Path | None = None) -> dict:
     """Colours, target order and thresholds for the explorer, emitted into the page as JSON.
 
     The comparison charts are drawn in JavaScript, so this is how they stay in step with
@@ -390,6 +416,12 @@ def explorer_tokens() -> dict:
     comes from here. The three run slots are the categorical slots the palette validator
     passes on the map in both light and dark; a fourth hue fails the colour-blindness
     check against orange, which is why at most three runs can be ticked at once.
+
+    `topojsonUrl` tells the map where to fetch the world from, and it is only filled in
+    when `site` is given and really carries the file: pointing plotly at a folder that has
+    no map in it breaks the map outright, where leaving this None falls back to plotly's
+    own CDN, which is where the map comes from today and only costs the first draw. The
+    default of no site keeps every caller that has no site directory to speak of working.
     """
     slots = ["london", "madrid", "us-east"]
     return {
@@ -403,6 +435,11 @@ def explorer_tokens() -> dict:
         "intervalS": INTERVAL_S,
         "maxRuns": len(slots),
         "font": FONT,
+        # plotly joins this with the map's name: topojsonURL + "world_110m" + ".json",
+        # adding the slash itself if it is missing. It is written in here anyway, so that
+        # the folder reads as a folder.
+        "topojsonUrl": "assets/" if site is not None and (site / TOPOJSON_ASSET).exists()
+                       else None,
     }
 
 
@@ -528,7 +565,11 @@ def build_report(run: dict, traces: dict | None = None, *,
         fig = map_figure(run, traces)
         fig.update_layout(height=520, margin={"l": 0, "r": 0, "t": 30, "b": 0},
                           paper_bgcolor="rgba(0,0,0,0)", font={"family": FONT})
-        map_html = f'<section class="card"><h2>route map</h2>{_div(fig, "map")}</section>'
+        # The map is the one figure that fetches anything: give it the site's own copy of
+        # the world when this page is being published beside one.
+        map_config = _plot_config(plotly_src if plotly == "external" else None)
+        map_html = (f'<section class="card"><h2>route map</h2>'
+                    f'{_div(fig, "map", map_config)}</section>')
 
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
