@@ -4,10 +4,11 @@ Last updated: 2026-09-03
 
 ## Now
 
-- [ ] Publish from your own terminal to put the explorer live, and open the site to check
-      it (see PLAN.md step 5). It has to be your terminal: the container's run log holds
-      different runs, so a publish from there would leave your two published runs without
-      their data
+- [ ] pingme as an instrument for dota-brazil → PLAN.md (approved 2026-09-04, groups A
+      and B). Custom targets and the override defect, a schema version, --note, --trace,
+      then spikes with the router as witness and a same-network guard on compare.
+      Asked for by ~/code/vpn, which is read-only from here; the reply goes in
+      notes/reply-to-dota-brazil-2026-09-04.md when the work is done
 
 ## Next
 

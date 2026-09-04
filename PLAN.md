@@ -1,266 +1,157 @@
-# pingme: one page to read any run and compare up to three
+# pingme as an instrument for dota-brazil
 
-Date: 2026-09-03. Branch `master`, working tree clean after c6c9bd8.
-Status: **built.** Steps 0 to 4 and 6 are done; step 5 is the user's, and only theirs.
-Commits 7fdec1c (this plan), 52de17a (the feature), 1e66806 (the review round).
-Mockup: https://claude.ai/code/artifact/fe5fdc5f-b0ca-44ba-a503-9f36f3822dec
-(four screens: comparing two runs, one run ticked, nothing ticked, and a rejected
-"one column per run" alternative, drawn from two real runs in the log).
+Date: 2026-09-04. Branch `master`, clean at b1e71e8.
+Status: **approved 2026-09-04.** Groups A and B are being built; group C is not.
+A spike means what it means in `dota-lat`: an idle sample more than 30 ms above that
+target's own idle mean. The user chose that over pingme's percentile style so the two
+tools' spike counts are the same kind of number, which is what their rule 2 needs.
 
-## Context
+Source of the request: `~/code/vpn/handoff/pingme/2026-09-04_dota-brazil-requests.xml`,
+written by the vpn project's session on 2026-09-04 against pingme at 969e990. That
+project is read-only from here: nothing under `~/code/vpn` is created, changed, moved or
+deleted, ever, including its handoff folder. The reply goes in this repository, at
+`notes/reply-to-dota-brazil-2026-09-04.md`, once work is done.
 
-Today the site publishes one finished HTML page per run and a static table that links
-to them. The numbers that drew each page are thrown away after rendering, so two runs
-can only be compared by opening two tabs. The user wants one page on GitHub Pages that
-lists every published run, shows any one of them in full, and shows two or three of
-them together, same chart, one colour per run, so a home Wi-Fi run and a wired run at a
-friend's house can be read against each other in seconds, route map included.
+## Who is asking, and for what
 
-The user's own words on what "compare" means: not several servers on one graph, but
-the same measurement from different runs on one graph.
+The vpn project is choosing a network route from this laptop to Valve's Dota relay in São
+Paulo. Its rule disqualifies a route on loss above 0.5 %, on any burst of three lost
+probes, on a spike count more than twice the control's, on a p99 more than 40 ms above
+the median, or on jitter more than twice the control's; only then does the lowest typical
+latency win, and only by 10 ms or more. The control is always a no-tunnel run taken in
+the same sitting on the same network.
 
-## Decisions, with the evidence behind them
+pingme already measures nearly all of that in one run and keeps the raw samples. It is
+also the only instrument either project has that pings the router at the same instant as
+the relays, which is what makes the router usable as a witness.
 
-**Colour means run, never target.** In the comparison view every coloured mark is a run.
-Targets are text: axis labels, a selector, table rows. The first ticked run takes slot 1
-(blue), the next slot 2 (orange), the next slot 3 (aqua). A run keeps its colour until
-it is unticked; unticking one never repaints the others (dataviz: colour follows the
-entity, not its rank). The run colours are the same three hues the run pages use for
-London, Madrid and US-East. That is acceptable because the two views are never on
-screen together, and the run tiles at the top of the comparison teach the mapping.
+## What I verified myself before proposing anything
 
-**Three runs at most.** The palette validator (`dataviz/scripts/validate_palette.js`)
-passes four slots side by side in both modes but fails four on the map, where any two
-routes can touch: yellow against orange measures 13.7, under the 15 floor for
-full-colour vision. Three slots pass every check in both modes. The picker refuses a
-fourth tick and says why in a sentence.
+Their ground rules ask for this, and the tree has moved since 969e990.
 
-**Overlay only where the axes agree.** The histogram overlays: two distributions on one
-axis is what a histogram is for, drawn as step outlines with a 10 % wash so neither run
-hides the other, on bins shared across the ticked runs. Round trip over time does not
-overlay: runs differ in length (the log holds 30 s, 60 s and 600 s runs) and the speed
-test starts at a different second in each, so the panels sit side by side on one shared
-vertical scale. Phase bands in those panels are grey, not orange and aqua, because the
-run colour is the only identity channel there.
+| claim | verdict | what I ran |
+|---|---|---|
+| D1: an override zeroes the local overhead | **true** | `_local_overhead` gives 9.1 ms honestly; point the Madrid slot at a London node answering in 12.6 ms and it gives **0.0**, blaming "madrid minus a direct cable's ~19 ms" |
+| D2: a 600 s run is busy for 20 s | **true** | `Timing(600, 10)` is 3.3 % busy; the Santander record shows busy sent of 103 or 104 per target against idle sent of 2,896 |
+| D3/R2: the spikes are the link, on a rhythm | **true, exactly** | router 36 spikes, london 36, us-east 74, sao-paulo 34; 75 %, 72 % and 71 % within one second of a router spike; router episode starts 35, 32, 237, 80, 33, 36 s apart |
+| D4: compare ignores the network | **true** | `cli.py` compare never reads `snapshot` |
+| D5: no trace without `--web` | **true** | `cli.py:48`, `trace=web or publish` |
+| every cited file:line | **still accurate** | checked each one at HEAD |
 
-**One target selector scopes the drill-down.** Above the table, the histogram, the
-timelines and the map sits one segmented control (router, London, Madrid, US-East, São
-Paulo). Everything below follows it. The two overview charts above it show every target
-at once: median with a p95 mark, and the under-load penalty with the warning and
-critical lines drawn in. Default target: São Paulo when present, else the first relay.
+## Two things about the two tools that nobody has written down
 
-**One ticked run shows today's run page.** The detail view is the existing
-`runs/<id>.html` in a same-origin iframe sized to its content. That is the whole
-detail view: nothing is reimplemented, so it cannot drift from the page the user
-already knows, and the tiles, hop table, map and footnote come for free.
+**They agree on loss, and that is worth knowing.** A note in their review worried that
+pingme reconstructs loss from sequence numbers while `dota-lat` trusts ping's summary
+line. Not so: pingme takes its sent count from the same `N packets transmitted` line
+(`probe.py:108-112`) and computes `(sent - received) / sent`, which is what ping prints.
+Sequence numbers are used only to say *which* probes went missing, for the burst figure.
+The two loss percentages are the same quantity and can be compared directly.
 
-**The comparison charts are written once, in JavaScript.** There is no way round this
-for an interactive page on static hosting. The Python side stays the single source of
-truth for colours, target order and thresholds by emitting them into the page as a
-JSON block; the JavaScript reads that block and never hard-codes a hex.
+**They do not agree on which machine they are pinging, and nobody noticed.** pingme takes
+the first relay Valve lists for a city (`targets.py`, `parse_sdr`, `pop["relays"][0]`).
+`dota-lat` pings the first three and keeps the best (`dota-lat.sh:293, 358-368`). So the
+two tools can be measuring different hosts inside the same Valve site, and a few
+milliseconds of unexplained difference between them would have no other cause. This is
+new: it is not in their review. Cheap to settle, and it belongs in the reply whatever
+else is built.
 
-**The URL carries the state.** `?runs=<id>,<id>&target=sao-paulo`, so a comparison can
-be bookmarked or sent to someone.
+Jitter genuinely differs — pingme is the mean absolute jump between consecutive replies,
+`dota-lat` reports ping's `mdev`, a spread about the mean — but their plan already says
+so in section 1 and asks for no change.
 
-**Never counted and counted zero stay different.** A run published before bursts were
-counted shows "—" for burst, not 0, in the picker, the tiles and the table.
+## What I propose, and how it differs from their order
 
-## What gets published, and its size
+Their priorities are R1 to R10. I propose three groups. Take, drop or reorder any of it.
 
-Per run, next to the existing page: `runs/<id>.json`, the redacted record as
-`publish()` already builds it for the page, samples and traces included. Measured on the
-log: a 60 s run is 59 KB (15 KB as GitHub serves it, compressed); the 600 s run is
-458 KB (110 KB). The page fetches only the runs that are ticked.
+### Group A — make the record trustworthy and self-describing (about 4 hours)
 
-`runs/index.json` keeps its rows and gains `duration_s` and `traced` (whether a map is
-available). `assets/explorer.js` is written on every publish, like the page. `index.html`
-becomes the explorer shell: the report's own CSS, the tokens block, one `<main>`, the
-plotly script tag, and the explorer script tag.
+Small, and everything else builds on it. Their Phase K script is blocked on R4 today.
+
+| item | what | why here |
+|---|---|---|
+| **D1 + R1** | a repeatable `--target NAME=IP`, kind `custom`, no coordinates, no physics block, excluded from local overhead; `PINGME_OVERRIDE` marks its slot `custom` too | one change fixes the defect and adds the feature: both come down to a target that is measured but not placed on the map |
+| **R4** | `"schema": 1` on every new record, plus `notes/record-schema.md` naming every field and its unit | their reading script breaks silently without it, and it is the cheapest item on the list |
+| **R5** | `--note`, stored verbatim, shown by `show`, `list` and `compare` | `--label` is sanitised into the run id, so `route=mudfish475` is mangled today |
+| **R8** | `--trace`, which traces and stores without building a report | one flag; every 10-minute run should carry its hop table |
+
+### Group B — the measurement only pingme can make (about 5 hours)
+
+| item | what | why here |
+|---|---|---|
+| **R2** | per target: spike count, the episodes they form, and for every non-router target the share of its spikes within one second of a router spike; stored, shown in the summary table, and drawn as a faint band on every timeline | this is the link-or-route question their whole method rests on, and pingme is the only tool that can answer it because it probes concurrently |
+| **R3** | `compare`: a red warning when SSID, interface or provider differ, a delta column, and rows for the R2 figures | prevents the one mistake that ruins a series, and it is what their verdict reads |
+| **D2** | show the busy sample count beside the busy p95 in both renderers | a +144 ms headline resting on 104 probes should say so |
+
+### Group C — NOT being built now (2026-09-04)
+
+Left for a later decision. R6 `--busy` is held back deliberately: growing the default busy
+window would make a new 10-minute run's under-load penalty incomparable with every run
+already in the log. R7 stays investigation-first whenever it happens.
+
+<details>
+<summary>what group C would have been</summary>
+
+
+
+| item | what | my view |
+|---|---|---|
+| **R6** | `--busy SECONDS`, and scale the default with run length | worth doing, but see the open question below: changing the default silently makes old and new penalties incomparable |
+| **R10** | `pingme reanalyse ID` | worth more after R2 than before it: it would give the two old BT runs a spike figure |
+| **R9** | scheduled runs | I can write the systemd unit and timer, but I cannot install them: anything reaching your real home has to be run by you |
+| **R7** | UDP to the relays' game ports | **investigation only.** Read Valve's GameNetworkingSockets relay-ping code, find out whether an unauthenticated probe is answered at all, write the finding, and build nothing until you have read it |
+
+</details>
+
+### Small things folded in for free
+
+- **D6**: one sentence in the `jitter` docstring saying it spans two send intervals when
+  the probe between was lost, so a lossy run reads slightly high.
+- **D7**: the physics line to read "closest of 3 candidates", so nobody takes a guess for
+  a measurement. Their review already refuses to cite it as evidence.
+
+## What I am not proposing
+
+The four suggestions marked "not needed by dota-brazil" in the request: `--minutes N`, a
+per-target verdict line, a network column in `list`, and data-driven physics candidates.
+They are reasonable and they are already yours to want; none of them serves this request,
+so they belong in TODO.md rather than in this plan.
+
+## Open questions, which change what gets built
+
+1. **A spike means mean + 30 ms over idle samples.** Settled 2026-09-04: the same
+   definition `dota-lat` uses (`SPIKE_OVER=30`), so their rule 2, "more than twice the
+   control's", compares two numbers of the same kind. Deliberately not pingme's usual
+   percentile style, and the reason is written into the code.
+2. **`--busy` is not being built**, so the default busy window does not move and every
+   run already in the log stays comparable with every new one.
+3. **Schema version and old records.** Settled: no existing record has one, so absent
+   means "before versioning" and new records start at 1. Their script handles both.
+4. **Scope.** Settled: groups A and B.
 
 ## Success criteria
 
-All named in one message at the end, per CLAUDE.md:
+Per this project's CLAUDE.md, named in one message at the end: `uv run ruff check .`
+clean, `uv run pytest` green including the JavaScript tests, and a real run on this
+machine with its output shown for anything that measures or draws. Pure functions get a
+test against hand-computed inputs before they are wired in. Specific to this work:
 
-- `uv run ruff check .` clean; `uv run pytest` green, including the JavaScript tests it
-  runs through `node --test` (skipped with a printed reason when node is missing).
-- The live site, opened by the user (the container has no browser): the table lists
-  every published run newest first, sortable by column; ticking one run shows that
-  run's page below the table; ticking a second switches to the comparison; a fourth
-  tick is refused with a message; each run keeps its colour on the tiles, both
-  overview charts, the table header, the histogram, its timeline panel and the map;
-  reloading the URL restores the same ticks and target.
-- Runs published before bursts were counted show "—" for burst, not 0.
-- The two runs in the mockup, republished, read the same numbers on the live page as
-  on the mockup: Leeds 44.3/63.4 Mbit/s with a 236 ms São Paulo penalty against
-  Santander 175.1/224.2 with 83.8 ms.
-- The palette validator output for the three run slots is recorded in the plan
-  (done, above) and the page never generates a fourth hue.
+- The R2 figures reproduce the numbers in the table above from the Santander record,
+  within one sample.
+- A synthetic case: a router episode at 10 to 12 s and a target spike at 11 s gives
+  coincidence 1.0; the same spike at 20 s gives 0.0.
+- `--target n475=IP` produces an entry with loss, burst, idle and busy summaries and
+  samples, no `physics` key, and `local_overhead_ms` unchanged from a run without it.
+- `compare` on two SantanderGuest runs prints no warning; against a BT-FMAGNK run it
+  prints the warning and still prints the table.
+- Every run in the log still renders in `show`, `web` and the explorer, and a figure
+  nobody measured is still an em dash while a measured zero is still 0.
 
-## Steps
+## Ground rules carried from both sides
 
-Each step is one commit. Python edits go through the shell (the ruff format hook would
-rewrite the file, see CLAUDE.md). After a multi-part edit, grep for each change.
-
-### [x] Step 0: approval and bookkeeping (5 min)
-
-- This file approved by the user. TODO.md Now points here.
-
-### [x] Step 1: publish the data and the shell (45 min)
-
-Files: `src/pingme/publish.py`, `src/pingme/render_web.py`, new
-`src/pingme/explorer.js`, `tests/test_publish.py`.
-
-- `publish()` writes `runs/<id>.json` (`json.dumps` of the redacted record, compact)
-  beside the page, and copies `src/pingme/explorer.js` to `assets/explorer.js` on every
-  publish (`importlib.resources` so the installed package finds it).
-- `store.summary_row` gains `duration_s` and `traced` (`"traces" in run`).
-- `render_web.explorer_tokens()` returns a dict: `LIGHT`, `DARK`, `STATUS`, the three
-  run slots for each mode, `TARGET_ORDER`, the four thresholds, `INTERVAL_S`.
-  `publish.build_index(rows)` becomes the explorer shell: `_css()` plus the explorer
-  CSS, `<script id="pingme-tokens" type="application/json">`, an empty `<main>`, the
-  plotly tag pointing at `PLOTLY_ASSET`, then `assets/explorer.js`. It no longer renders
-  the table in Python; the script does, from `runs/index.json`.
-- Tests: `publish()` into a temp site dir (the existing test does this) writes the
-  `.json`, the `.js` and an `index.html` that contains the tokens block, the plotly tag
-  and the explorer tag and no inline plotly; `explorer_tokens()` round-trips through
-  JSON and carries exactly three run slots per mode.
-
-### [x] Step 2: the picker and the detail view, in JavaScript (1 h)
-
-File: `src/pingme/explorer.js`, plus `tests/explorer.test.js` and a pytest wrapper.
-
-Structure the file so the pure parts are plain functions on one object that the test
-file can import (`export` at the bottom guarded by `typeof module`), and the DOM code
-runs only in a browser.
-
-- Load `runs/index.json`. Render the table: tick, swatch, run, date, ISP, city, medium,
-  duration, down/up, worst loss, worst burst, São Paulo p95. Click a header to sort;
-  default newest first. Runs are named by label, else id.
-- Ticks: `assignSlot(state, id)` gives the lowest free slot; `release(state, id)` frees
-  it and leaves the others alone; the fourth tick is refused with the sentence
-  "Three runs at most: a fourth colour cannot be told apart on the map."
-- URL: `readState(search)` and `writeState(state)`; `history.replaceState` on every
-  change; the page restores from the URL on load.
-- One tick: an iframe of `runs/<id>.html` below the table, height set from
-  `contentDocument.documentElement.scrollHeight` on load and on resize. The frame is
-  same-origin, so this works on GitHub Pages and on a local file. The table stays
-  above it.
-- Zero ticks: the hint card from the mockup.
-- Tests (node): slot assignment and release across tick, tick, untick, tick; the
-  refusal at four; URL state round trip with and without a target; sort by each
-  column with "—" values last.
-- The pytest wrapper: `tests/test_explorer_js.py` runs `node --test tests/` with
-  `subprocess`, fails on a non-zero exit, and `pytest.skip`s with the reason when
-  `shutil.which("node")` is None. CLAUDE.md gets one line saying the JS tests need
-  node.
-
-### [x] Step 3: the comparison view (2 h)
-
-File: `src/pingme/explorer.js`, `tests/explorer.test.js`.
-
-Fetch each ticked run's JSON (cache in memory; hold the previous render at reduced
-opacity while fetching, never a blank). Then, top to bottom as in the mockup:
-
-- Run tiles: swatch and name, date, ISP, city, medium, duration; download and upload;
-  probes lost across all non-silent targets with the loss badge (zero is the only
-  green). These are the legend for every chart below.
-- Overview pair (plotly, `barmode: "group"`, bars 14 px, `cornerradius: 4`):
-  median per target with the p95 as a short vertical marker in the same colour; the
-  under-load penalty per target with hairlines at 50 and 200 labelled warning and
-  critical. Targets on the y axis in `TARGET_ORDER`, silent targets omitted.
-- The target selector. Default São Paulo.
-- The table for the selected target: loss %, probes lost, longest burst, best, median,
-  p95, p99, jitter, under-load penalty, then download, upload, local overhead. The
-  better value per row in bold (lower wins, except throughput). "—" where a run lacks
-  the figure.
-- Histogram: `sharedBins(runs, target, n=30)` from the union of the runs' minimum to
-  the largest p99; one `scatter` per run with `line.shape: "hv"`, 2 px, `fill:
-  "tozeroy"` at 10 % opacity; direct label at each run's peak, legend from the tiles.
-- Timelines: one plotly div per run in a two-column grid, `yaxis.range` shared and
-  computed once from the union; grey phase bands with labels; lost probes as red
-  crosses on the floor; the run name and date as the panel title with its swatch.
-- Dark mode: the same restyle-on-theme-change script the run pages use, driving from
-  the tokens block, so the run slots swap to their dark steps.
-- Tests (node): `sharedBins` on hand-made samples (edges, counts, a value at the top
-  edge lands in the last bin); `diffRows` marks the lower value best for latency and
-  the higher for throughput, and never marks a lone value; `penalty` is busy p95 minus
-  idle p95 or null; `sharedYRange` covers every run's p99 with 5 % slack.
-
-### [x] Step 4: the map (45 min)
-
-File: `src/pingme/explorer.js`.
-
-- For the selected target, one `scattergeo` line per run in its colour, dashed on a
-  segment that crosses hidden hops (the same rule as `render_map._segments`), a marker
-  at every placed hop with the city and delay on hover, the run name as a direct label
-  at the far end, and a star at each run's origin. Reference cable landing points as
-  today. `fitbounds: "locations"`.
-- A run without a trace gets no line and a one-line note under the map naming it.
-- No new test beyond a node test for `routePoints(trace)` (collapse same-place hops,
-  count hidden hops between drawn points), which mirrors the Python function.
-
-### [ ] Step 5: publish, backfill, look (45 min)
-
-- From the container: `uv run pingme publish leeds_bt_2026-08-30T13-59` republishes the
-  run the container made, which writes the new `index.html`, `explorer.js` and that
-  run's `.json`.
-- The user, from their own terminal: `pingme publish leeds_bt_2026-08-30T15-32` and
-  `pingme publish 2026-09-03T13-14` so both mockup runs carry their data.
-- The user opens https://filipejunqueira.github.io/internet-speed-reports/ and walks
-  the success criteria above. Whatever reads wrong gets fixed in this step, with the
-  observation written into the plan.
-
-### [x] Step 6: docs and wrap (15 min)
-
-- CLAUDE.md: Commands gain the JS test note; Structure gains `explorer.js` and the
-  `runs/<id>.json` files; Overview mentions the comparison page.
-- TODO.md: Done entry; Now emptied. Archive this file under `notes/plans/`.
-
-## What actually differed from this plan
-
-Written down because the plan is the record of why, and these are the places where the
-plan and the code disagree.
-
-- **One `explorer.js` became six modules** under `src/pingme/site/`: `state.js`,
-  `stats.js`, `dom.js`, `figures.js`, `map.js` and `app.js`. The split was made so seven
-  agents could write in parallel without two of them ever opening the same file, and it
-  paid off twice over: five of the six are pure, so 131 node tests cover them without a
-  browser, and only `app.js` needs a person to read it.
-- **`assignSlot` and `release` became one `toggleRun(state, id, maxRuns)`** returning
-  `{state, refused}`. The refusal has to come back to the caller, which the plan's pair
-  of functions had nowhere to put.
-- **The tokens block is camelCase** (`runSlots`, `targetOrder`, `intervalS`), not the
-  Python constants' names.
-- **`traced` was added to the index row and then removed.** Nothing read it: the page
-  works out which runs lack a map from the full records. An unread field with two test
-  assertions propping it up is dead weight.
-- **The backfill was not in the plan.** An audit pointed out that only the run being
-  published got its data file, so every run already on the site would have had a row in
-  the table and nothing behind it. Publishing now writes the data file for every run
-  already listed, and only for those.
-- **The hop table under the map was not in the plan either.** Every hop delay and address
-  was reachable only by hovering, and the rule this project follows, which the single-run
-  report pages already satisfy, is that a tooltip enhances and never gates.
-- **Step 5 was not done from the container**, contrary to what the plan said. The
-  container's private log holds different runs from the user's, so a publish from there
-  would write the new page but leave the user's two published runs without their data
-  until the user published again. Better to do it once, from the machine that has the log.
-
-## Risks named up front
-
-- **Two implementations of the same charts.** Only the comparison charts are in
-  JavaScript, and they take colours, order and thresholds from Python. The detail view
-  is the Python page itself. Drift is confined to chart shape, and both use plotly.
-- **plotly's map data.** The run pages already draw the map with the site's own plotly
-  copy; the explorer uses the same copy and the same map type, so nothing new is
-  fetched. If the map fails to draw on the live page, that is a pre-existing condition
-  to record, not a regression of this plan.
-- **Iframe height.** A same-origin frame can be measured; a wrong height shows as a
-  nested scrollbar, which the user will see in step 5. Fallback: a generous fixed
-  height with the frame's own scrollbar.
-- **Node on the user's machine.** The JS tests skip without it and say so. The
-  container has node 26, so the suite runs fully here.
-
-## Effort
-
-About five hours: the comparison view is the bulk, the rest is plumbing.
+- Python edits through the shell: the ruff format hook would rewrite about 993 lines of
+  hanging indents.
+- Add fields, never repurpose one. Never reshape `analysis.targets.NAME.samples`.
+- A lesson from their CLAUDE.md worth heeding here: they were bitten by a `link=` tag
+  stamped from the network current at write time rather than the one the reading was
+  taken on. If R10 lands, a recomputed record keeps the original snapshot.
+- Nothing under `~/code/vpn` is written to, in any circumstance.
