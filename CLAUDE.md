@@ -18,6 +18,15 @@ back, which is what a game actually feels. An address that never answers at all,
 like the ISP hop on BT, is reported as silent with its sent count, not as 100 %
 loss. Note the limit: these are ICMP probes, not game traffic. Routers drop
 ICMP first under load, so this can show loss a game would never feel.
+Each target also reports its spikes: idle probes more than 30 ms above that target's own
+idle average, the episodes they form, and how many of them land within a second of a
+router spike. Because every target is probed at the same instant, a distant target whose
+spikes all coincide with the router's has no spikes of its own: the wifi link stalled and
+everything inherited it. The 30 ms comes from `dota-lat.sh` in the user's vpn project, so
+the two tools' spike counts are the same kind of number.
+
+Every field of a record is described in `notes/record-schema.md`, and each record carries
+a `schema` integer so a reader outside this project can tell when the shape changed.
 Design and evidence: `notes/plans/2026-08-31_pingme-v1-and-pages.plan.md` for v1 and
 publishing, `notes/plans/2026-09-03_loss-you-can-trust.plan.md` for how loss is
 counted; direction: `TODO.md`.
@@ -26,6 +35,12 @@ counted; direction: `TODO.md`.
 
 - install deps: `uv sync`
 - run (60 s): `uv run pingme --label <name>`; `--quick` 30 s, `--long` 2 min, `--longer` 10 min
+- add a target for one run: `--target <name>=<address>`, repeatable. It is measured like any
+  other but never placed on the map, so it takes no part in the local-overhead figure and
+  gets no route verdict
+- `--note "<text>"` is stored on the record exactly as typed, unlike `--label`, which is
+  sanitised into the run id. It is replaced by "redacted" when a run is published
+- `--trace` records the route without building a report
 - run + web report: `uv run pingme --label <name> --web`
 - read the log back: `uv run pingme list`, `uv run pingme show [id]`, `uv run pingme compare A B`
 - web report for a saved run: `uv run pingme web [id]` (`--no-map` skips the map; runs made

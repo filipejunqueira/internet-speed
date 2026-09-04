@@ -26,7 +26,11 @@ def trace_run(run: dict, status=lambda msg: None) -> dict:
     out = {}
     with httpx.Client() as client:
         for t in run["targets"]:
-            if t["kind"] != "relay":
+            # Custom targets are traced too. They are the whole reason somebody adds one:
+            # a proxy node's hop table is the only thing that shows where a proxied route
+            # spends its time after the node. Only the local hops are skipped, because a
+            # traceroute to your own router says nothing anybody needs.
+            if t["kind"] in ("gateway", "isp-hop"):
                 continue
             status(f"tracing {t['name']} ({t['ip']}) …")
             hops, err = trace(t["ip"])

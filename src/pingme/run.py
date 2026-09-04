@@ -13,9 +13,24 @@ from . import speed
 from .places import FORTALEZA, LONDON, MIAMI, NEW_YORK, SINES
 from .probe import INTERVAL_S, Phase, ProbeResult, probe_all, send_offset, send_time
 from .snapshot import route_for, take_snapshot
-from .stats import RouteCandidate, longest_burst, lost_seqs, physics_verdict, summarise
+from .stats import (
+    SPIKE_OVER_MS,
+    RouteCandidate,
+    coincidence,
+    episodes,
+    longest_burst,
+    lost_seqs,
+    physics_verdict,
+    spike_times,
+    summarise,
+)
 from .store import append_run
 from .targets import Target, fetch_sdr, local_targets, parse_sdr
+
+# Version of the saved record's shape. Bump it whenever a field is added or changes
+# meaning, and say what changed in notes/record-schema.md. Records written before this
+# existed have no "schema" key at all, which is how a reader tells them apart.
+SCHEMA = 1
 
 ROUTE_CANDIDATES: dict[str, list[RouteCandidate]] = {
     "sao-paulo": [
@@ -60,9 +75,34 @@ def _resolve_targets(status) -> tuple[list[Target], str]:
         name, _, ip = pair.partition("=")
         for t in targets:
             if t.name == name.strip() and ip:
-                t.ip, t.note = ip.strip(), f"overridden via PINGME_OVERRIDE ({t.note})"
+                # The address changed but the slot kept its name, its city and its
+                # coordinates, which made a London node answering in 12.6 ms look like
+                # Madrid and dragged the local overhead from 9.1 ms down to 0.0. An
+                # overridden slot is not where it says it is, so it stops being placed.
+                t.ip = ip.strip()
+                t.note = (f"overridden via PINGME_OVERRIDE, no longer the "
+                          f"{t.kind} it is named after ({t.note})")
+                t.kind, t.city, t.lat, t.lon = "custom", None, None, None
                 status(f"[yellow]{t.name} overridden to {t.ip}[/yellow]")
     return targets, source
+
+
+def add_extra_targets(targets: list[Target],
+                      extra: list[tuple[str, str]] | None) -> list[Target]:
+    """Append addresses asked for by hand: measured, but not placed on the map.
+
+    We know what such an address answers in, not where it is, so it gets no physics
+    block and takes no part in the local overhead. A name already in use is refused
+    rather than quietly replaced: two rows under one name would ruin the log.
+    """
+    out = list(targets)
+    for name, ip in extra or []:
+        if any(t.name == name for t in out):
+            raise ValueError(f"there is already a target called {name!r}; give {ip} a "
+                             f"different name rather than replacing it")
+        out.append(Target(name=name, ip=ip, kind="custom", city=None, lat=None, lon=None,
+                          note="added with --target"))
+    return out
 
 
 def flag_odd_routes(targets: list[Target], default_dev: str | None, status,
@@ -121,6 +161,9 @@ def _local_overhead(results: list[ProbeResult], targets: dict[str, Target],
     best_gap, how = None, "unknown"
     for r in results:
         t = targets.get(r.target)
+        # An overridden slot is kept out of this by being marked "custom" upstream in
+        # _resolve_targets, not here: without coordinates, "its round trip minus a
+        # straight cable to it" has no meaning, so it cannot set the overhead.
         if not t or t.kind != "relay" or t.lat is None or not r.samples:
             continue
         floor = haversine_km(origin, (t.lat, t.lon)) / KM_PER_MS_ROUND_TRIP * CABLE_DETOUR_FACTOR
@@ -172,11 +215,35 @@ def account_for_probes(r: ProbeResult, marks: dict) -> tuple[dict, dict[str, int
     return detail, sent_in
 
 
+def _stalls(samples: list[tuple], router_spikes: list[float], is_router: bool) -> dict | None:
+    """How often this target stalled while the line was idle, and who stalled with it.
+
+    None when there are no idle samples to judge: a silent address, or a run too short
+    to have an idle phase. Nobody could count, which is not the same as no stalls.
+    """
+    times, idle_mean = spike_times(samples)
+    if idle_mean is None:
+        return None
+    return {
+        "threshold_ms": SPIKE_OVER_MS,
+        "idle_mean_ms": round(idle_mean, 2),
+        "spikes": len(times),
+        "episodes": episodes(times),
+        "router_coincidence": None if is_router else coincidence(times, router_spikes),
+    }
+
+
 def analyse(results: list[ProbeResult], targets: list[Target], snapshot: dict,
             marks: dict, route=route_for) -> dict:
     by_name = {t.name: t for t in targets}
     origin = _origin(snapshot)
     overhead, overhead_how = _local_overhead(results, by_name, origin)
+    stored = {r.target: [(s.seq, s.rtt_ms, round(s.t, 3), s.phase) for s in r.samples]
+              for r in results}
+    # Every target is probed at the same instant, which makes the router the one witness
+    # we have for "the local link stalled" against "the route stalled". Find it once.
+    router = next((r.target for r in results if by_name[r.target].kind == "gateway"), None)
+    router_spikes = spike_times(stored[router])[0] if router is not None else []
     per_target = {}
     for r in results:
         t = by_name[r.target]
@@ -198,7 +265,8 @@ def analyse(results: list[ProbeResult], targets: list[Target], snapshot: dict,
             "idle": summaries[1].as_dict(),
             "busy": summaries[2].as_dict(),
             "loss": detail if r.samples else None,
-            "samples": [(s.seq, s.rtt_ms, round(s.t, 3), s.phase) for s in r.samples],
+            "stalls": _stalls(stored[r.target], router_spikes, is_router=r.target == router),
+            "samples": stored[r.target],
         }
         if t.kind == "relay" and r.samples and t.lat is not None:
             eff, verdicts, best = physics_verdict(
@@ -212,7 +280,8 @@ def analyse(results: list[ProbeResult], targets: list[Target], snapshot: dict,
 
 
 def run(label: str | None, timing: Timing, status=lambda msg: None,
-        trace: bool = False) -> dict:
+        trace: bool = False, note: str | None = None,
+        extra: list[tuple[str, str]] | None = None) -> dict:
     """Measure, analyse, optionally trace the routes, then append to the log.
 
     Tracing at run time keeps the map honest: a report built later from the saved
@@ -222,6 +291,7 @@ def run(label: str | None, timing: Timing, status=lambda msg: None,
     status("reading connection details …")
     snapshot = take_snapshot()
     targets, sdr_source = _resolve_targets(status)
+    targets = add_extra_targets(targets, extra)
     if not targets:
         raise RuntimeError("no targets at all: no default route and no relay list")
     flag_odd_routes(targets, snapshot.get("interface"), status)
@@ -231,7 +301,11 @@ def run(label: str | None, timing: Timing, status=lambda msg: None,
     analysis = analyse(results, targets, snapshot, marks)
     record = {
         "id": make_run_id(label, when),
+        "schema": SCHEMA,
         "label": label,
+        # Stored exactly as it was typed. The label is scrubbed into the run id, which
+        # mangles anything with an = or a / in it; the note is where that survives.
+        "note": note or None,
         "timestamp": when.isoformat(),
         "duration_s": timing.total_s,
         "phase_marks_s": {k: round(v, 2) for k, v in marks.items()},

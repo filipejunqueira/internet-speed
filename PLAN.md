@@ -31,7 +31,7 @@ Their ground rules ask for this, and the tree has moved since 969e990.
 
 | claim | verdict | what I ran |
 |---|---|---|
-| D1: an override zeroes the local overhead | **true** | `_local_overhead` gives 9.1 ms honestly; point the Madrid slot at a London node answering in 12.6 ms and it gives **0.0**, blaming "madrid minus a direct cable's ~19 ms" |
+| D1: an override zeroes the local overhead | **true** | `_local_overhead` gives an honest figure (9.1 ms on my synthetic case, 8.9 on the Santander record's own numbers); point the Madrid slot at a London node answering in 12.6 ms and it gives **0.0**, blaming "madrid minus a direct cable's ~19 ms" |
 | D2: a 600 s run is busy for 20 s | **true** | `Timing(600, 10)` is 3.3 % busy; the Santander record shows busy sent of 103 or 104 per target against idle sent of 2,896 |
 | D3/R2: the spikes are the link, on a rhythm | **true, exactly** | router 36 spikes, london 36, us-east 74, sao-paulo 34; 75 %, 72 % and 71 % within one second of a router spike; router episode starts 35, 32, 237, 80, 33, 36 s apart |
 | D4: compare ignores the network | **true** | `cli.py` compare never reads `snapshot` |

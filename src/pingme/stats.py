@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import bisect
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass, replace
 from math import asin, cos, radians, sin, sqrt
@@ -12,6 +13,19 @@ import numpy as np
 KM_PER_MS_ROUND_TRIP = 100.0
 # Real cables are not great circles; this is the usual allowance.
 CABLE_DETOUR_FACTOR = 1.3
+# A spike is an idle sample this far above that target's own idle mean. 30 ms is the
+# same number as SPIKE_OVER in the vpn project's dota-lat.sh, on purpose: its rule
+# "more than twice the control run's spike count" only means something if the two
+# tools are counting the same thing.
+SPIKE_OVER_MS = 30.0
+# Two spikes no further apart than this belong to the same stall. Probes leave every
+# 0.2 s, so this is ten intervals: wide enough to join a stall that happened to spare
+# a probe in the middle, narrow enough to keep two separate stalls apart. On the
+# 10-minute Santander run no two spikes fell between 1.9 s and 2.1 s apart, so the
+# exact boundary never arises there and the choice of <= over < changes nothing.
+EPISODE_GAP_S = 2.0
+# How close a target's spike has to be to a router spike to count as the same stall.
+COINCIDENCE_WINDOW_S = 1.0
 
 
 @dataclass
@@ -84,11 +98,78 @@ def longest_burst(lost: list[int]) -> tuple[int, int]:
 
 
 def jitter(rtts: list[float]) -> float:
-    """Mean absolute difference between consecutive round trips (the RFC 3550 idea)."""
+    """Mean absolute difference between consecutive round trips (the RFC 3550 idea).
+
+    Consecutive *replies*, not consecutive probes: when the probe between two replies
+    was lost, the jump spans two send intervals instead of one, so a lossy run reads
+    slightly high.
+    """
     if len(rtts) < 2:
         return 0.0
     a = np.asarray(rtts, dtype=float)
     return float(np.abs(np.diff(a)).mean())
+
+
+def spike_times(samples: list[tuple], threshold_ms: float = SPIKE_OVER_MS
+                ) -> tuple[list[float], float | None]:
+    """When this target stalled while the line was idle, and the mean it is judged against.
+
+    `samples` is the stored form: (seq, rtt_ms, seconds since the run began, phase).
+    Only idle samples count, because the speed test slows everything down on purpose
+    and those milliseconds are not a stall. Returns the spike times in ascending order
+    and the mean of the idle round trips. No idle samples at all gives ([], None):
+    nobody could count, which is not the same as counting none.
+    """
+    idle = [(float(t), float(rtt)) for _seq, rtt, t, phase in samples if phase == "idle"]
+    if not idle:
+        return [], None
+    mean = float(np.asarray([rtt for _t, rtt in idle], dtype=float).mean())
+    return sorted(t for t, rtt in idle if rtt > mean + threshold_ms), mean
+
+
+def episodes(times: list[float], gap_s: float = EPISODE_GAP_S) -> list[dict]:
+    """Group spike times into stalls: spikes no further apart than gap_s are one stall.
+
+    `times` must be ascending. Each episode says when it started, how long it lasted
+    and how many spikes it holds; a lone spike is an episode of length 0.0 holding one.
+    """
+    out: list[dict] = []
+    group: list[float] = []
+    for t in times:
+        if group and t - group[-1] > gap_s:
+            out.append(_episode(group))
+            group = []
+        group.append(t)
+    if group:
+        out.append(_episode(group))
+    return out
+
+
+def _episode(group: list[float]) -> dict:
+    return {"at_s": round(group[0], 2), "length_s": round(group[-1] - group[0], 2),
+            "probes": len(group)}
+
+
+def coincidence(target_times: list[float], router_times: list[float],
+                window_s: float = COINCIDENCE_WINDOW_S) -> float | None:
+    """The share of this target's spikes that a router spike happened alongside, 0 to 1.
+
+    The router is pinged at the same instant as every relay, so it is the one witness
+    we have. Near 1 means the local link stalled and this target merely inherited it;
+    near 0 means the stall was further out, on the route. None when there is nothing to
+    take a share of (this target never spiked) or no witness (the router never spiked,
+    or there is no router in the run). Never raises.
+    """
+    if not target_times or not router_times:
+        return None
+    ordered = sorted(router_times)
+    near = 0
+    for t in target_times:
+        i = bisect.bisect_left(ordered, t)
+        # only the router spike either side of t can be the nearest one
+        if any(abs(ordered[j] - t) <= window_s for j in (i - 1, i) if 0 <= j < len(ordered)):
+            near += 1
+    return round(near / len(target_times), 2)
 
 
 def haversine_km(a: tuple[float, float], b: tuple[float, float]) -> float:

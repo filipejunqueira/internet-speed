@@ -20,6 +20,7 @@ from plotly.offline import get_plotlyjs
 
 from .probe import INTERVAL_S
 from .render_map import TRACE_QUERIES, hop_rows, map_figure, traced_path, traces_for
+from .stats import COINCIDENCE_WINDOW_S, SPIKE_OVER_MS
 from .store import burst_probes, data_dir, is_silent
 
 TARGET_ORDER = ["router", "isp-hop", "london", "madrid", "us-east", "sao-paulo"]
@@ -120,8 +121,34 @@ def _hist(entry: dict) -> go.Figure:
     return fig
 
 
-def _timeline(entry: dict, marks: dict) -> go.Figure:
+def _stall_band(fig: go.Figure, episodes: list[dict] | None,
+                x_from: float, x_to: float) -> None:
+    """Shade the times the router itself stalled, behind everything else on the timeline.
+
+    Drawn in the neutral grey of the page's own furniture rather than any target or phase
+    colour, and below the traces, so a band cannot be read as data. Each stall is widened
+    by the coincidence window on both sides, because that is the window the share counts
+    over: a spike a second either side of a router spike is counted alongside it, so it
+    should be seen inside the shading rather than just outside it. That also gives a
+    single-spike stall, whose length is 0, a band a reader can see.
+
+    The widened band is then trimmed back to the samples' own span. Plotly stretches an
+    axis to fit a shape, so a stall in the first second of a run would otherwise push the
+    timeline out to a negative second; the terminal drawing trims for the same reason.
+    """
+    for ep in episodes or []:
+        x0 = max(x_from, ep["at_s"] - COINCIDENCE_WINDOW_S)
+        x1 = min(x_to, ep["at_s"] + ep.get("length_s", 0.0) + COINCIDENCE_WINDOW_S)
+        if x1 > x0:
+            fig.add_vrect(x0=x0, x1=x1, fillcolor=CHROME["light"]["muted"], opacity=0.16,
+                          line_width=0, layer="below")
+
+
+def _timeline(entry: dict, marks: dict, episodes: list[dict] | None = None) -> go.Figure:
     fig = go.Figure()
+    times = [s[2] for s in entry["samples"]]
+    if episodes and times:
+        _stall_band(fig, episodes, min(times), max(times))
     for phase in ("idle", "download", "upload"):
         pts = [(s[2], s[1]) for s in entry["samples"] if s[3] == phase]
         if pts:
@@ -260,8 +287,35 @@ def _route_table(trace_entry: dict) -> str:
             f"<tbody>{body}</tbody></table></details>")
 
 
+def _closest_of(physics: dict) -> str:
+    """How many candidate routes the verdict was picked from.
+
+    The verdict is the candidate whose physics comes closest to the measured time, not a
+    route anybody traced, and it should not be read as one.
+    """
+    n = len(physics.get("candidates") or [])
+    return f"closest of {n} route{'s' if n != 1 else ''} considered"
+
+
+def _stall_fact(entry: dict) -> str | None:
+    """How often this target stalled while idle, and how often the router stalled with it.
+
+    None when the record carries no stalls block: it was saved before stalls were counted,
+    or this target had no idle probes to judge. A share of "—" means there is none to
+    take: the router is the witness, so it has no share of its own, and neither has a
+    target that never spiked.
+    """
+    stalls = entry.get("stalls")
+    if stalls is None:
+        return None
+    share = stalls.get("router_coincidence")
+    share_text = "—" if share is None else f"{share * 100:.0f} %"
+    return f"spikes {stalls['spikes']} (with a router stall: {share_text})"
+
+
 def _target_section(name: str, entry: dict, marks: dict, i: int,
-                    trace_entry: dict | None = None) -> str:
+                    trace_entry: dict | None = None,
+                    episodes: list[dict] | None = None) -> str:
     a = entry["all"]
     silent = is_silent(entry)
     lost = None if a["loss_pct"] is None else a["sent"] - a["received"]
@@ -286,14 +340,21 @@ def _target_section(name: str, entry: dict, marks: dict, i: int,
               f"median {_fmt(a['median_ms'])} ms", f"p95 {_fmt(a['p95_ms'])} ms",
               f"jitter {_fmt(a['jitter_ms'])} ms"]
     if penalty is not None:
-        facts.append(f"under-load penalty {penalty:+.0f} ms "
+        # The speed test lasts the same twenty seconds however long the run is, so on a
+        # ten-minute run this figure rests on about a hundred probes out of three thousand.
+        facts.append(f"under-load penalty {penalty:+.0f} ms ({entry['busy']['sent']:,} busy "
+                     f"probes) "
                      f'<span class="badge {pen_status[0]}">{pen_status[1]} {pen_status[0]}</span>')
+    stall_fact = _stall_fact(entry)
+    if stall_fact:
+        facts.append(stall_fact)
     path = traced_path(trace_entry) if trace_entry else None
     if path:
         facts.append("traced path: <b>" + html.escape(path) + "</b>")
     if physics.get("most_consistent"):
         facts.append(f"timing estimate: {html.escape(physics['most_consistent'])} "
-                     f"(~{physics['effective_ms']:.0f} ms after local overhead)")
+                     f"(~{physics['effective_ms']:.0f} ms after local overhead, "
+                     f"{_closest_of(physics)})")
     route = (entry.get("route") or {}).get("dev")
     if silent:
         facts = [f"{a['sent']:,} probes sent, none came back"]
@@ -302,15 +363,32 @@ def _target_section(name: str, entry: dict, marks: dict, i: int,
     elif entry.get("error") and not entry["samples"]:
         body = f'<p class="error">{html.escape(entry["error"])}</p>'
     else:
-        body = (f'<div class="pair">{_div(_hist(entry), f"h{i}")}{_div(_timeline(entry, marks), f"t{i}")}'
+        body = (f'<div class="pair">{_div(_hist(entry), f"h{i}")}'
+                f'{_div(_timeline(entry, marks, episodes), f"t{i}")}'
                 f"</div>{_stats_table(entry)}"
                 f"{_route_table(trace_entry) if trace_entry else ''}")
     badge = ("" if silent else
              f'<span class="badge {loss_status[0]}">{loss_status[1]} loss</span>')
-    return (f'<section class="card" id="target-{name}"><h2>{name} '
-            f'<span class="ip">{entry["ip"]}{" · via " + route if route else ""}</span>'
+    # The name and the address can now come from --target, so they are typed by hand like
+    # any other string on this page and are escaped like any other string on this page.
+    safe = html.escape(name)
+    return (f'<section class="card" id="target-{safe}"><h2>{safe} '
+            f'<span class="ip">{html.escape(str(entry["ip"]))}'
+            f'{" · via " + html.escape(route) if route else ""}</span>'
             f'{badge}</h2>'
             f'<p class="facts">{" · ".join(facts)}</p>{body}</section>')
+
+
+def _router_episodes(run: dict) -> list[dict]:
+    """When the local link itself stalled, taken from the router's own stalls block.
+
+    Empty when the run has no router, or was saved before stalls were counted: then no
+    band is drawn on any timeline and nothing is claimed.
+    """
+    for entry in run["analysis"]["targets"].values():
+        if entry.get("kind") == "gateway":
+            return (entry.get("stalls") or {}).get("episodes") or []
+    return []
 
 
 def _css() -> str:
@@ -475,13 +553,21 @@ def _theme_js() -> str:
 
 
 def redact(run: dict) -> dict:
-    """A deep copy of the run with the public IP and the Wi-Fi name replaced by "redacted"."""
+    """A deep copy of the run with the public IP, the Wi-Fi name and the note taken out.
+
+    The note goes because it is free text the user typed and nobody reviews it before a
+    publish. The whole point of a note is to record what a run was taken through and on,
+    so it holds exactly the two things the other two lines exist to remove: the example in
+    the request that asked for the field is "route=mudfish475 link=BT-FMAGNK".
+    """
     out = copy.deepcopy(run)
     s = out.get("snapshot") or {}
     if s.get("public"):
         s["public"]["ip"] = "redacted"
     if s.get("wifi"):
         s["wifi"]["ssid"] = "redacted"
+    if out.get("note"):
+        out["note"] = "redacted"
     return out
 
 
@@ -528,6 +614,10 @@ def build_report(run: dict, traces: dict | None = None, *,
         conn = f"Ethernet {e.get('link_speed_mbps')} Mbit/s {e.get('duplex')} duplex"
     else:
         conn = "connection type unknown"
+    # Whatever --note was given, kept as it was typed. It is escaped here like every other
+    # string that reaches the page: the record stores it verbatim, the page must not.
+    note_html = ("" if not run.get("note") else
+                 f'<p class="meta">note: {html.escape(str(run["note"]))}</p>')
     meta = (f"{run['timestamp'][:19].replace('T', ' ')} UTC · {run['duration_s']:.0f} s run · {conn} · "
             f"public {html.escape(str(pub.get('ip')))} ({html.escape(str(pub.get('isp')))}, "
             f"{html.escape(str(pub.get('city')))}, {html.escape(str(pub.get('country')))})")
@@ -551,14 +641,19 @@ def build_report(run: dict, traces: dict | None = None, *,
         _tile("local overhead", f"{a['local_overhead_ms']:.0f} <small>ms</small>",
               a["local_overhead_how"]),
         _tile("São Paulo route", html.escape(sp_phys.get("most_consistent") or "—"),
-              f"~{sp_phys.get('effective_ms', 0):.0f} ms after local overhead"
-              if sp_phys else "no measurement"),
+              f"~{sp_phys.get('effective_ms', 0):.0f} ms after local overhead, "
+              f"{_closest_of(sp_phys)}" if sp_phys else "no measurement"),
     ]
     thr = "".join(_div(_throughput(sp), f"s-{sp['direction']}") for sp in run["speed"]
                   if sp["samples_mbps"])
-    sections = "".join(_target_section(n, targets[n], run.get("phase_marks_s", {}), i,
-                                       (traces or {}).get(n))
-                       for i, n in enumerate(order))
+    episodes = _router_episodes(run)
+    sections = "".join(
+        _target_section(n, targets[n], run.get("phase_marks_s", {}), i, (traces or {}).get(n),
+                        # The router's own section gets no band: shading its stalls behind
+                        # its own spikes would say nothing, and the question a band answers
+                        # is whether a distant target stalled with the local link.
+                        None if targets[n].get("kind") == "gateway" else episodes)
+        for i, n in enumerate(order))
     comparison = _div(_comparison(targets, order), "cmp")
     map_html = ""
     if traces:
@@ -575,7 +670,7 @@ def build_report(run: dict, traces: dict | None = None, *,
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>pingme — {html.escape(run['id'])}</title><style>{_css()}</style>
 {_plotly_script(plotly, plotly_src)}</head><body><main>
-<h1>pingme — {html.escape(run['id'])}</h1><p class="meta">{meta}</p>
+<h1>pingme — {html.escape(run['id'])}</h1><p class="meta">{meta}</p>{note_html}
 <div class="tiles">{''.join(tiles)}</div>
 <section class="card"><h2>throughput</h2><div class="pair">{thr}</div></section>
 {sections}
@@ -588,8 +683,16 @@ pingme's own thresholds: any lost probe at all is flagged, loss ≥{LOSS_WARN:g}
 ≥{LOSS_CRIT:g} % critical; burst ≥{BURST_WARN:g} probes warning, ≥{BURST_CRIT:g} critical;
 penalty ≥{PENALTY_WARN:g} ms warning, ≥{PENALTY_CRIT:g} ms critical. An address that never
 answers is reported as silent rather than as total loss.
+A spike is one idle probe more than {SPIKE_OVER_MS:g} ms above that target's own idle average, and
+the run of spikes around it is a stall; probes sent while the speed test was running are left out,
+because those milliseconds were asked for. Every target is probed at the same instant, so the
+router is the one witness available for "the local link stalled" as against "the route stalled":
+the grey bands on each timeline are the router's own stalls, drawn {COINCIDENCE_WINDOW_S:g} s either
+side because that is the window the "with a router stall" share counts over. A target spike inside
+a band was almost certainly the link here, not the route.
 Route verdicts compare the best round trip, minus local overhead, with the time light needs
-through fibre along each candidate cable path (×1.3 for real cable routing). Each hop in
+through fibre along each candidate cable path (×1.3 for real cable routing); the one named is
+whichever candidate comes closest, not a route anybody traced, so it is a guess and not evidence. Each hop in
 "every hop" was measured {TRACE_QUERIES} times by traceroute, so its delay wobbles and an
 "added" figure can come out negative; that is noise, not a router giving time back. Routers
 often answer traceroute slowly or not at all on purpose, so an unanswered probe there says

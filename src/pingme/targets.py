@@ -24,7 +24,10 @@ POP_COORDS = {"lhr": (51.51, -0.13), "iad": (39.01, -77.43), "gru": (-23.55, -46
 class Target:
     name: str
     ip: str
-    kind: str  # "gateway" | "isp-hop" | "relay"
+    # "custom" is an address measured but not placed: no city, no coordinates, so no
+    # physics block and no part in the local overhead. --target makes one, and so
+    # does PINGME_OVERRIDE, because an overridden slot is no longer where it says.
+    kind: str  # "gateway" | "isp-hop" | "relay" | "custom"
     city: str | None = None
     lat: float | None = None
     lon: float | None = None
