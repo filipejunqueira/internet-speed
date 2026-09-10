@@ -1,10 +1,18 @@
 # TODO — internet-speed
 
-Last updated: 2026-09-03
+Last updated: 2026-09-10
 
 ## Now
 
-- [ ] Nothing. Pick the next item from Next.
+- [ ] Walk the published explorer once on the live site and tick step 5 of
+      `notes/plans/2026-09-03_run-explorer.plan.md`, which is still open: the item was
+      overwritten here rather than ticked. Checks: the table sorts by any column;
+      ticking one run opens its report; ticking a second switches to the comparison; a
+      fourth tick is refused; each run keeps its colour across the tiles, both overview
+      charts, the histogram, its own timeline and the map; reloading the URL restores
+      the same ticks and the same target; a run published before bursts were counted
+      shows an em dash rather than 0. Changing the target is already confirmed fast
+      (2026-09-10).
 
 ## Next
 
@@ -20,6 +28,13 @@ Last updated: 2026-09-03
       incomparable with every run already in the log. The default must not move.
 - [ ] UDP probes to the relays' game ports (their R7): read Valve's GameNetworkingSockets
       relay-ping code first and write the finding; build only if the relays answer
+
+- [ ] Decide with the vpn project which relay to ping. pingme takes the first relay
+      Valve lists for a city; `dota-lat.sh` pings the first three and keeps the best, so
+      the two tools can be measuring different machines inside one Valve site, which is
+      the only possible cause of a few ms of otherwise unexplained difference. Three
+      ways to settle it are in `notes/reply-to-dota-brazil-2026-09-04.md`; only the
+      third changes any code here (`parse_sdr`). blocked-by: the vpn project's answer
 
 - [ ] Physics route floors are too coarse near 190 ms (Madrid-side cable vs via USA); add candidate cables landing in Spain/Portugal, or drop the estimate when hops are visible
 - [ ] Doubtful hop geolocation (RIPE IPmap put a Telefónica router in Saint Petersburg); show a confidence or prefer hostname codes
@@ -41,6 +56,14 @@ Last updated: 2026-09-03
 - [ ] Scheduled background runs
 
 ## Done
+
+- 2026-09-10 — Wrap-up corrections, no code changed. CLAUDE.md said `PINGME_OVERRIDE`
+  only swapped an address; since bee8f86 it also marks the slot custom, drops its
+  coordinates and removes its physics block, so anyone writing a failure test that
+  expected a physics verdict on an overridden slot would have been surprised. The
+  corrections log gained the reason the map topology is fetched from `cdn.plot.ly/un/`
+  rather than the older path. The ruff-format lesson moved out of auto-memory into the
+  global `rules/python.md`.
 
 - 2026-09-04 — pingme became an instrument for the vpn project's dota-brazil work
   (commit bee8f86, record schema 1). `--target NAME=IP` adds a target for one run,

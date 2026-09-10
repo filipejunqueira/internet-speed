@@ -76,7 +76,9 @@ they are wired in.
   listed on the site, and only for those: a run in the private log that was never
   published must not reach the site as a side effect of publishing another.
 - `notes/reports/` — hand-copied reports for review, git-ignored.
-- `PINGME_OVERRIDE="sao-paulo=192.0.2.1"` swaps a target's address (failure tests).
+- `PINGME_OVERRIDE="sao-paulo=192.0.2.1"` swaps a target's address (failure tests). The
+  slot then counts as `custom`: no coordinates, no physics block, and no part in the
+  local-overhead figure, because it is no longer where its name says it is.
 
 ## Corrections log
 
@@ -106,4 +108,10 @@ they are wired in.
   `uv run ruff check .`, which is the project's actual gate (2026-09-03).
 - `node --test tests/js/` does not walk a directory on node 26: it tries to load the path as
   a module and fails. Pass the glob, `node --test "tests/js/*.test.js"` (2026-09-03).
+- The map topology comes from `cdn.plot.ly/un/world_110m.json`, not the older
+  `cdn.plot.ly/world_110m.json`. This plotly.js builds the name from its default
+  `topojsonURL` of `.../un/` plus the map's scope and resolution; the older path holds a
+  different, smaller file, so serving that would quietly redraw the world's borders
+  rather than only move where they come from. Reasoning in `publish.fetch_topojson`
+  (2026-09-04).
 - plotext 6 is a rewrite; the code targets 5.x, pinned `<6` (2026-08-29).
