@@ -30,7 +30,7 @@ from .targets import Target, fetch_sdr, local_targets, parse_sdr
 # Version of the saved record's shape. Bump it whenever a field is added or changes
 # meaning, and say what changed in notes/record-schema.md. Records written before this
 # existed have no "schema" key at all, which is how a reader tells them apart.
-SCHEMA = 1
+SCHEMA = 2
 
 ROUTE_CANDIDATES: dict[str, list[RouteCandidate]] = {
     "sao-paulo": [

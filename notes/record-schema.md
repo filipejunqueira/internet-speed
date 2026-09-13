@@ -264,6 +264,7 @@ relays are traced. Each entry holds:
 | field | type | meaning |
 |---|---|---|
 | `error` | string or null | why the trace failed, when it did |
+| `traced_at` | string | when the route was traced, ISO 8601 with a UTC offset. The same value on every entry of one run, because one call is one act of tracing. **Absent on traces written before schema 2**, where nothing recorded it |
 | `hops` | array of objects | one per hop, each with `n` (hop number from 1), `ip` (string, or null when that router did not answer), `avg_ms` (number or null) and `loss_pct` (number or null) |
 | `locations` | array | same length and order as `hops`. Each entry is null, or an object with `ip`, `lat`, `lon` (degrees, either can be null when the hop could not be placed), `city`, `hostname` and `source` saying how it was located: `private`, `hostname:<airport code>`, `ripe-ipmap`, `ip-api` or `unknown` |
 
@@ -271,7 +272,22 @@ Hop locations come from public databases and airport codes in hostnames. They ar
 guesses, sometimes wrong ones, and are best treated as decoration on a map rather than
 as evidence.
 
+A trace is not always taken with the run it belongs to. A run measured without `--web`,
+`--publish` or `--trace` carries no route at all; if a report or a map is built for it
+later, the route is traced then, from wherever the machine is that day, and stored on the
+published copy alone — the record in the private log never learns it. So `traced_at` is
+not decoration: it is the only thing separating the route a run took from a route measured
+weeks later on a different network. A reader comparing `traced_at` against `timestamp` and
+`duration_s` can tell which they are holding. Absent, they cannot, and should assume they
+cannot.
+
 ## Version history
+
+**2** (2026-09-10) — every entry of `traces` gained `traced_at`, the moment the route was
+traced. Nothing existing was renamed or given a new meaning. A schema 1 record that was
+traced has the same `hops` and `locations` without that field, which reads as "nobody
+recorded when", because a trace made at publish time is indistinguishable from one made
+with the run once the date is gone.
 
 **1** (2026-09-04) — the first numbered version. Added `schema` and `note` at the top
 level, `stalls` on every target, and the `custom` target kind, which also stopped an

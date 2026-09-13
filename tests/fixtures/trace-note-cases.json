@@ -1,0 +1,156 @@
+{
+  "_readme": [
+    "Hand-written cases for the sentence a page shows about when a route was traced.",
+    "Read by tests/test_render_map.py and tests/js/map.test.js, so Python and JavaScript",
+    "are held to the same answers and cannot drift apart. Every 'note' below is a literal",
+    "somebody worked out on paper; no test computes its own expectation.",
+    "A case added here fails both test suites until both sides handle it.",
+    "The rule: silence when the trace was taken within the run's own length plus fifteen",
+    "minutes of the run starting, because a trace runs after the probes stop and takes a",
+    "minute or two. Otherwise the date and the gap, floored to the largest whole unit.",
+    "The gap is measured from the end of the run, which is where the window ends too.",
+    "The last two cases carry no offset. Python reads such a stamp as UTC; `new Date` would read it as the reader's own local time. One sits just after midnight UTC and one just before, so any zone at all shifts one of them across a date boundary and fails. tests/test_explorer_js.py runs the node suite under UTC+14 and UTC-11 to make that bite."
+  ],
+  "cases": [
+    {
+      "why": "no stamp at all: a trace made before the field existed",
+      "run_started": "2026-08-30T13:59:15.284226+00:00",
+      "duration_s": 30.0,
+      "traced_at": null,
+      "note": "When this route was traced was not recorded."
+    },
+    {
+      "why": "the ordinary case: traced 65 s after a 60 s run started, so 5 s after it ended",
+      "run_started": "2026-08-30T14:00:00+00:00",
+      "duration_s": 60.0,
+      "traced_at": "2026-08-30T14:01:05+00:00",
+      "note": null
+    },
+    {
+      "why": "exactly on the window: 60 s of run plus 900 s of grace is 960 s, and this is 960 s",
+      "run_started": "2026-08-30T14:00:00+00:00",
+      "duration_s": 60.0,
+      "traced_at": "2026-08-30T14:16:00+00:00",
+      "note": null
+    },
+    {
+      "why": "one second past the window: 961 s from the start, so 901 s after the run ended, floored to 15 minutes",
+      "run_started": "2026-08-30T14:00:00+00:00",
+      "duration_s": 60.0,
+      "traced_at": "2026-08-30T14:16:01+00:00",
+      "note": "Traced on 2026-08-30, 15 minutes after this run, so it may not be the path the run took."
+    },
+    {
+      "why": "hours: the run ended at 14:01 and the trace ran at 18:01, four hours later",
+      "run_started": "2026-08-30T14:00:00+00:00",
+      "duration_s": 60.0,
+      "traced_at": "2026-08-30T18:01:00+00:00",
+      "note": "Traced on 2026-08-30, 4 hours after this run, so it may not be the path the run took."
+    },
+    {
+      "why": "one hour, singular: the run ended at 14:01 and the trace ran at 15:06, so 1 h 5 min",
+      "run_started": "2026-08-30T14:00:00+00:00",
+      "duration_s": 60.0,
+      "traced_at": "2026-08-30T15:06:00+00:00",
+      "note": "Traced on 2026-08-30, 1 hour after this run, so it may not be the path the run took."
+    },
+    {
+      "why": "one day, singular: the run ended at 14:01 on the 30th, the trace ran at 15:00 the next day",
+      "run_started": "2026-08-30T14:00:00+00:00",
+      "duration_s": 60.0,
+      "traced_at": "2026-08-31T15:00:00+00:00",
+      "note": "Traced on 2026-08-31, 1 day after this run, so it may not be the path the run took."
+    },
+    {
+      "why": "the run this whole change came from: leeds_bt 13:59 on 2026-08-30, re-traced on publish eleven days later",
+      "run_started": "2026-08-30T13:59:15.284226+00:00",
+      "duration_s": 30.0,
+      "traced_at": "2026-09-10T14:30:00+00:00",
+      "note": "Traced on 2026-09-10, 11 days after this run, so it may not be the path the run took."
+    },
+    {
+      "why": "eleven and a half days is still eleven days: the gap is floored, never rounded up",
+      "run_started": "2026-08-30T14:00:00+00:00",
+      "duration_s": 60.0,
+      "traced_at": "2026-09-11T02:01:00+00:00",
+      "note": "Traced on 2026-09-11, 11 days after this run, so it may not be the path the run took."
+    },
+    {
+      "why": "no duration recorded: the window falls back to the grace alone, and 10 min is inside it",
+      "run_started": "2026-08-30T14:00:00+00:00",
+      "duration_s": null,
+      "traced_at": "2026-08-30T14:10:00+00:00",
+      "note": null
+    },
+    {
+      "why": "no duration recorded and 20 min later, so outside the 15 min window",
+      "run_started": "2026-08-30T14:00:00+00:00",
+      "duration_s": null,
+      "traced_at": "2026-08-30T14:20:00+00:00",
+      "note": "Traced on 2026-08-30, 20 minutes after this run, so it may not be the path the run took."
+    },
+    {
+      "why": "a --longer run: 600 s of run plus grace is 1500 s, and this trace is 1400 s in",
+      "run_started": "2026-08-30T14:00:00+00:00",
+      "duration_s": 600.0,
+      "traced_at": "2026-08-30T14:23:20+00:00",
+      "note": null
+    },
+    {
+      "why": "offsets are normalised before subtracting: 15:00+01:00 is 14:00Z, so this trace is 30 s in",
+      "run_started": "2026-08-30T15:00:00+01:00",
+      "duration_s": 60.0,
+      "traced_at": "2026-08-30T14:00:30+00:00",
+      "note": null
+    },
+    {
+      "why": "the date shown is the UTC date: 00:30 on the 11th in Berlin is 22:30 on the 10th in UTC",
+      "run_started": "2026-08-30T14:00:00+00:00",
+      "duration_s": 60.0,
+      "traced_at": "2026-09-11T00:30:00+02:00",
+      "note": "Traced on 2026-09-10, 11 days after this run, so it may not be the path the run took."
+    },
+    {
+      "why": "a Z suffix means UTC, and both languages must read it",
+      "run_started": "2026-08-30T14:00:00Z",
+      "duration_s": 60.0,
+      "traced_at": "2026-08-30T14:01:05Z",
+      "note": null
+    },
+    {
+      "why": "a stamp nobody can read is a stamp we do not have, and must not throw",
+      "run_started": "2026-08-30T14:00:00+00:00",
+      "duration_s": 60.0,
+      "traced_at": "sometime last week",
+      "note": "When this route was traced was not recorded."
+    },
+    {
+      "why": "a run with no start either: still an answer, still not a crash",
+      "run_started": null,
+      "duration_s": 60.0,
+      "traced_at": "2026-09-10T14:30:00+00:00",
+      "note": "When this route was traced was not recorded."
+    },
+    {
+      "why": "a trace stamped before its own run is a corrupt record: say nothing rather than nonsense",
+      "run_started": "2026-08-30T14:00:00+00:00",
+      "duration_s": 60.0,
+      "traced_at": "2026-08-30T13:00:00+00:00",
+      "note": null
+    },
+    {
+      "why": "no offset means UTC, not the reader's own clock: 00:10 shifts back a day in any zone ahead of UTC",
+      "run_started": "2026-08-30T14:00:00+00:00",
+      "duration_s": 60.0,
+      "traced_at": "2026-09-10T00:10:00",
+      "note": "Traced on 2026-09-10, 10 days after this run, so it may not be the path the run took."
+    },
+    {
+      "why": "the same rule the other way: 23:50 shifts forward a day in any zone behind UTC",
+      "run_started": "2026-08-30T14:00:00+00:00",
+      "duration_s": 60.0,
+      "traced_at": "2026-09-10T23:50:00",
+      "note": "Traced on 2026-09-10, 11 days after this run, so it may not be the path the run took."
+    }
+  ]
+}

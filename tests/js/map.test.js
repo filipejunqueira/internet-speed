@@ -4,10 +4,13 @@
 // The traces here are hand-built, one awkward case each, because the real traces in the
 // log are long and every interesting case in them is buried in the middle of forty hops.
 
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { hopRows, mapFigure, routePoints, untracedRuns } from '../../src/pingme/site/map.js'
+import { hopRows, mapFigure, routePoints, traceNote, untracedRuns } from '../../src/pingme/site/map.js'
 
 const TOKENS = {
   runSlots: { light: ['#2a78d6', '#eb6834', '#1baf7a'], dark: ['#3987e5', '#d95926', '#199e70'] },
@@ -453,3 +456,30 @@ test('the relay ends the hop table too, so its address is not hover-only', () =>
   const [same] = hopRows([run], 'sao-paulo')
   assert.equal(same.points.length, 2, 'Miami is the relay, so there is no extra row')
 })
+
+// The cases for `traceNote` are not written here. They live in
+// tests/fixtures/trace-note-cases.json, which tests/test_render_map.py reads as well, so
+// the sentence written twice — once in Python for the report page, once here for the
+// explorer — is held to one set of answers. A case added to that file fails both suites
+// until both sides handle it.
+const CASES = JSON.parse(readFileSync(
+  fileURLToPath(new URL('../fixtures/trace-note-cases.json', import.meta.url)), 'utf8')).cases
+
+test('the shared cases file is not empty', () => {
+  // node passes a loop over an empty array, so an emptied or moved fixture would look
+  // exactly like a clean run. It is not one.
+  assert.ok(CASES.length >= 15, `only ${CASES.length} shared cases were loaded`)
+})
+
+for (const c of CASES) {
+  test(`traceNote: ${c.why}`, () => {
+    assert.equal(traceNote(c.run_started, c.duration_s, c.traced_at), c.note)
+  })
+}
+
+// The zone-independence check is not written here as an assertion. It is the last two
+// cases in the shared file, one just after midnight UTC and one just before, plus
+// tests/test_explorer_js.py running this suite under UTC+14 and UTC-11. An assertion
+// written here that compared one parse against another passed even with the guard in
+// map.js removed, because both sides of the comparison shifted together. Two literals
+// either side of a date boundary do not have that hole.

@@ -241,4 +241,7 @@ def test_run_takes_a_note_and_extra_targets():
     params = inspect.signature(run).parameters
     assert "note" in params and "extra" in params
     assert params["note"].default is None and params["extra"].default is None
-    assert SCHEMA == 1
+    # Bumped deliberately, never as a side effect: a change here means every reader
+    # outside this project sees a new shape, so notes/record-schema.md has to say what
+    # changed in the same commit. 2 (2026-09-10) added traced_at to every trace entry.
+    assert SCHEMA == 2

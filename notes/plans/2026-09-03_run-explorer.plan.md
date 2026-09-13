@@ -1,7 +1,11 @@
 # pingme: one page to read any run and compare up to three
 
 Date: 2026-09-03. Branch `master`, working tree clean after c6c9bd8.
-Status: **built.** Steps 0 to 4 and 6 are done; step 5 is the user's, and only theirs.
+Status: **done, with one thing left to decide.** Steps 0 to 6 are done. Step 5 was
+walked on the live site on 2026-09-10 with a headless browser, and the run that had
+no numbers was published from the container the same day. What the walk found, and
+what the publish turned up, are under that step. `uv run ruff check .` clean and
+`uv run pytest` green, 103 tests, on 2026-09-10.
 Commits 7fdec1c (this plan), 52de17a (the feature), 1e66806 (the review round).
 Mockup: https://claude.ai/code/artifact/fe5fdc5f-b0ca-44ba-a503-9f36f3822dec
 (four screens: comparing two runs, one run ticked, nothing ticked, and a rejected
@@ -199,7 +203,7 @@ File: `src/pingme/explorer.js`.
 - No new test beyond a node test for `routePoints(trace)` (collapse same-place hops,
   count hidden hops between drawn points), which mirrors the Python function.
 
-### [ ] Step 5: publish, backfill, look (45 min)
+### [x] Step 5: publish, backfill, look (45 min)
 
 - From the container: `uv run pingme publish leeds_bt_2026-08-30T13-59` republishes the
   run the container made, which writes the new `index.html`, `explorer.js` and that
@@ -209,6 +213,111 @@ File: `src/pingme/explorer.js`.
 - The user opens https://filipejunqueira.github.io/internet-speed-reports/ and walks
   the success criteria above. Whatever reads wrong gets fixed in this step, with the
   observation written into the plan.
+
+#### What the walk found (2026-09-10)
+
+Walked with a headless Chromium driving the live site, not by hand: every state was
+reached by clicking, and the colours were read out of plotly's own trace objects rather
+than judged from a picture. The four published runs were the whole sample, and three of
+them are the same Leeds line, so nothing here tests a big list.
+
+Passed, each with what was actually observed:
+
+- The table lists all four runs newest first and sorts by every column that carries a
+  key. Four columns do not change order when clicked: `isp` and `medium` because all
+  four rows hold the same value, `duration_s` and `worst_burst_probes` because one row
+  has a figure and three have none. That is `sortRows` doing what its comment says: a
+  missing figure sorts last in both directions and equal rows keep the order they came
+  in. Correct, not a defect.
+- One tick shows that run's own page in a frame, `data-run` matching, sized to 3,896 px
+  so there is no scrollbar inside a scrollbar.
+- A second tick switches to the comparison; a third adds the green slot; a fourth is
+  refused with "3 runs at most: a fourth colour cannot be told apart on the map."
+- Colour follows the run everywhere: `#2a78d6`, `#eb6834`, `#1baf7a` read straight off
+  the traces of `fig-overview`, `fig-penalty`, `fig-histogram`, each `fig-timeline-N`
+  and `fig-map`, and off the swatch in each table row and tile.
+- Unticking the middle of three runs left the other two on their original hues, and the
+  next run ticked took the freed orange slot. No repaint.
+- Only three run hues ever appear. The fourth colour on the page, `#898781`, is the
+  muted grey the tokens block gives the cable landing points and the origin marker.
+- The URL carries both `runs=` and `target=`, and reloading it restores the same three
+  ticks and the same target. Changing the target took about 2 seconds each time.
+- A figure nobody measured is U+2014 exactly, checked by code point, in the table's
+  burst column and in the "longest burst" row of the São Paulo table.
+- The mockup numbers hold on the live page: Leeds 44.3/63.4 Mbit/s with a 236.4 ms São
+  Paulo penalty, Santander 175.1/224.2 with 83.8 ms.
+
+Five things read wrong. None of them break the page; all five are written into TODO.md.
+
+1. **`runs/leeds_bt_2026-08-30T13-59-15Z.json` is 404**, so that run is listed but has
+   no numbers on the site. Ticking it alone still works, because that view is the
+   published HTML in a frame; in a comparison the page says "The numbers behind leeds_bt
+   would not load, so that run is missing from the charts below. Its own report page
+   still works." and draws the rest. The handling is right; the gap is real. Cause: that
+   run exists only in the container's log, and `backfill_run_data` can only write a run
+   its own machine still holds.
+
+2. **The table says a Leeds run lost 100.0 % while its tile says "6 probes lost,
+   warning"**, on the same screen. Both are honest about their own source. The table
+   column reads `worst_loss_pct` out of the row in `runs/index.json`, and those three
+   rows were written on 2026-08-30, when the silent ISP hop still counted as total loss.
+   `publish` replaces only the row of the run being published, so an old row keeps its
+   old numbers for ever. The same cause leaves the duration column showing an em dash
+   for runs whose record does carry 60 s.
+
+3. **Two runs share the label `leeds_bt`**, so every legend, every tile heading, the
+   comparison table header and the "would not load" sentence print the same name twice.
+   Colour separates them; the words do not.
+
+4. **Labels collide on three charts.** On "Extra delay while the line is busy" the
+   `warning` threshold text sits underneath the first legend entry. The histogram prints
+   all three run names stacked in its top-left corner, over the plot and over each
+   other, and repeats what the legend already says. On the map all three run names print
+   on the same point at São Paulo, and "You" prints twice over the UK.
+
+5. **`favicon.ico` is 404**, one console error on every page load. Cosmetic.
+
+One thing worth writing down that is not a defect in the page. The three Leeds records
+published on 2026-08-30 carry the old per-phase accounting: for São Paulo, `idle.sent`
+299 and `busy.sent` 102 against `all.sent` 300, so the idle span counts the busy probes
+and `idle.loss_pct` reads 34.11 %. The under-load penalty was checked against this and is
+sound: `idle.received` 197 plus `busy.received` 102 comes to `all.received` 299, so the
+replies were split between the phases correctly and only the sent counts overlap. The
+percentiles either phase reports, and the 236.4 ms penalty drawn from them, are therefore
+real. The explorer never shows a per-phase loss figure either: `stats.js` reads loss out
+of `entry.all` alone. So the stale figure is invisible on the site but sits in
+`runs/<id>.json` for anyone reading the published record directly. Those records carry no
+`schema` key, which `notes/record-schema.md` already defines as "before versioning", so a
+reader outside the project is warned. Republishing cannot mend it, because the record in
+the private log holds the same old numbers; `pingme reanalyse`, in TODO.md Later, is what
+would.
+
+#### What the publish turned up (2026-09-10)
+
+`uv run pingme publish leeds_bt_2026-08-30T13-59-15Z` from the container, with the user's
+yes, after fast-forwarding the container's site clone five commits. It fixed finding 1:
+the 404 has gone, all four runs now compare with no "would not load" sentence, and the
+run's own index row was rewritten by today's code, from 100.0 % worst loss and no
+duration to 0.7 % and 30 s. Nothing private reached the site: `backfill_run_data` walks
+the index rows, and the container's own runs are not on it.
+
+It also did something the command line does not warn about. The record carries no route
+trace, so publishing traced the route again — on the container's network on 2026-09-10,
+not the Leeds BT line the run measured on 2026-08-30 — and put that route on the page
+with nothing to say when it was measured. The run's first hops now read
+192.168.1.1 → 192.168.0.1 → 10.53.38.165 where its sibling from the same afternoon reads
+192.168.1.254 → 172.16.13.221 → 109.159.255.101, which is the real BT path. The private
+log was not touched: the fresh trace went only into the published copy.
+
+The deeper cause is that a trace carries no date. `traces.<target>` holds `hops`,
+`locations` and `error`, and nothing else, so no page and no reader can tell a route
+measured during the run from one measured weeks later somewhere else. Both the immediate
+choice and the fix are in TODO.md Now.
+
+Side effect worth naming: rewriting one row made the table less consistent, not more. The
+three Leeds runs now show 0.7 %, 100.0 % and 100.0 % side by side, because only the row
+of the run being published is ever rewritten. The other two are in the user's log, so
+publishing them from their terminal would bring all three into line.
 
 ### [x] Step 6: docs and wrap (15 min)
 
@@ -245,6 +354,14 @@ plan and the code disagree.
   container's private log holds different runs from the user's, so a publish from there
   would write the new page but leave the user's two published runs without their data
   until the user published again. Better to do it once, from the machine that has the log.
+
+  Since overtaken, and the reason is worth keeping so the two paragraphs do not read as a
+  contradiction. `backfill_run_data` now writes the numbers for every run the index
+  already lists, so a publish from the container no longer strands the user's runs: they
+  have their JSON either way. The objection has gone, and with it the reason not to
+  publish from the container. What is left is the opposite problem, found by the walk:
+  `leeds_bt_2026-08-30T13-59-15Z` exists only in the container's log, so the container is
+  now the only machine that can fill in its numbers.
 
 ## Risks named up front
 

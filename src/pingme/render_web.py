@@ -19,7 +19,7 @@ from plotly import __version__ as PLOTLY_VERSION
 from plotly.offline import get_plotlyjs
 
 from .probe import INTERVAL_S
-from .render_map import TRACE_QUERIES, hop_rows, map_figure, traced_path, traces_for
+from .render_map import TRACE_QUERIES, hop_rows, map_figure, trace_notes, traced_path, traces_for
 from .stats import COINCIDENCE_WINDOW_S, SPIKE_OVER_MS
 from .store import burst_probes, data_dir, is_silent
 
@@ -663,8 +663,14 @@ def build_report(run: dict, traces: dict | None = None, *,
         # The map is the one figure that fetches anything: give it the site's own copy of
         # the world when this page is being published beside one.
         map_config = _plot_config(plotly_src if plotly == "external" else None)
+        # A route traced with its own run says nothing here, which is the common case and
+        # leaves this page exactly as it was. A route traced later has to say so, or it
+        # reads as the path this run took when it may be a path from another network on
+        # another day. See trace_note in render_map.py.
+        said = " ".join(trace_notes(run, traces))
+        when = f'<p class="note">{html.escape(said)}</p>' if said else ""
         map_html = (f'<section class="card"><h2>route map</h2>'
-                    f'{_div(fig, "map", map_config)}</section>')
+                    f'{_div(fig, "map", map_config)}{when}</section>')
 
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
