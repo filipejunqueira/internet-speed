@@ -91,6 +91,8 @@ Last updated: 2026-09-10
 - [ ] Scheduled background runs
 
 ## Done
+- 2026-09-13 — Claude switched this repository to SSH on 2026-09-13. Outstanding work was committed as-is so nothing was left uncommitted.
+  Why: an HTTPS remote cannot push from the claude-sandbox container, which has no git credential helper and does not read the host's git config. SSH works there with no setup. Original remote URLs are recorded in the claude-config repo at notes/remote-urls-before-2026-09-13.txt.
 
 - 2026-09-10 — Walked the published explorer on the live site with a headless browser
   and did the looking half of step 5 of `notes/plans/2026-09-03_run-explorer.plan.md`.
