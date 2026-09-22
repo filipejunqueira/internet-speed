@@ -162,9 +162,18 @@ Named together in one message when they are all true, per CLAUDE.md:
         against another and both sides shifted together. Replaced by two cases either side
         of midnight UTC, plus `tests/test_explorer_js.py` running the node suite under
         UTC+14 and UTC-11. Removing the guard now fails the gate; checked both ways.
-- [ ] 3. `trace_run` stamps `traced_at`; `SCHEMA = 2`; `notes/record-schema.md`.
-- [ ] 4. Wire the report page, the standalone map page and the explorer caption, with the
-        invariant tests.
+- [x] 3. `trace_run` stamps `traced_at`; `SCHEMA = 2`; `notes/record-schema.md`.
+        The code landed in the 2026-09-13 wip commit e9d375b unticked; ticked 2026-09-22
+        once `test_trace_run_stamps_every_route_with_one_moment` held it (network stubbed:
+        one stamp across every relay entry, UTC offset written, local hops still skipped).
+- [x] 4. Wire the report page, the standalone map page and the explorer caption, with the
+        invariant tests. Wiring also from e9d375b. Tests added 2026-09-22 in
+        `tests/test_render_web.py` (invariant 1 by byte identity, invariant 2, the late
+        sentence, the map page's subtitle) and a `datedRoutes` node test. Invariant 1 was
+        also checked once against the code as it stood at c2fd266: the same fixture and a
+        with-the-run trace built a 4,353,693-byte report, identical under `cmp`. Gate:
+        ruff clean, pytest 130 passed, node 164 passed. `mapNoteText` in `app.js` has no
+        test of its own; the live explorer read in step 5 is its check.
 - [ ] 5. Gate; a real `--quick --web` run; republish the 13:59 run; read the live page;
         archive this plan and write TODO.md.
 

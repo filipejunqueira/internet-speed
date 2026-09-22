@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { hopRows, mapFigure, routePoints, traceNote, untracedRuns } from '../../src/pingme/site/map.js'
+import { datedRoutes, hopRows, mapFigure, routePoints, traceNote, untracedRuns } from '../../src/pingme/site/map.js'
 
 const TOKENS = {
   runSlots: { light: ['#2a78d6', '#eb6834', '#1baf7a'], dark: ['#3987e5', '#d95926', '#199e70'] },
@@ -483,3 +483,21 @@ for (const c of CASES) {
 // written here that compared one parse against another passed even with the guard in
 // map.js removed, because both sides of the comparison shifted together. Two literals
 // either side of a date boundary do not have that hole.
+
+test('datedRoutes names each run whose route needs a word, and only those', () => {
+  // All three runs started at 12:00 and lasted 60 s. One was traced with its run, one
+  // eleven days later, one never said when; the fourth has no route to this target at all.
+  const started = { timestamp: '2026-08-30T12:00:00+00:00', duration_s: 60 }
+  const traced = at => ({ ...LONDON_THEN_NOTHING, traced_at: at })
+  const runs = [
+    run('fresh', traced('2026-08-30T12:02:00+00:00'), started),
+    run('late', traced('2026-09-10T12:01:00+00:00'), { ...started, label: 'leeds_bt' }),
+    run('undated', LONDON_THEN_NOTHING, started),
+    run('untraced', null, started)
+  ]
+  assert.deepEqual(datedRoutes(runs, 'sao-paulo'), [
+    { label: 'leeds_bt',
+      note: 'Traced on 2026-09-10, 11 days after this run, so it may not be the path the run took.' },
+    { label: 'undated', note: 'When this route was traced was not recorded.' }
+  ])
+})

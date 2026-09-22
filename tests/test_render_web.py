@@ -27,9 +27,12 @@ def _doctored():
     run = json.loads(FIXTURE.read_text())
     london = run["analysis"]["targets"]["london"]
     london["silent"] = False
-    london["loss"] = {"lost": [[40, 8.0], [41, 8.2], [42, 8.4], [90, 18.0]],
-                      "longest_burst_probes": 3, "longest_burst_s": 0.6,
-                      "longest_burst_at_s": 8.0}
+    london["loss"] = {
+        "lost": [[40, 8.0], [41, 8.2], [42, 8.4], [90, 18.0]],
+        "longest_burst_probes": 3,
+        "longest_burst_s": 0.6,
+        "longest_burst_at_s": 8.0,
+    }
     quiet = run["analysis"]["targets"]["madrid"]
     quiet.update(silent=True, samples=[], loss=None)
     for phase in ("all", "idle", "busy"):
@@ -91,14 +94,28 @@ def test_an_old_records_silent_hop_no_longer_wins_worst_loss():
 
 def test_the_report_shows_every_hop_and_what_it_adds():
     run = json.loads(FIXTURE.read_text())
-    traces = {"london": {"error": None,
-                         "hops": [{"n": 1, "ip": "192.168.1.1", "avg_ms": 1.0, "loss_pct": 0.0},
-                                  {"n": 2, "ip": None, "avg_ms": None, "loss_pct": None},
-                                  {"n": 3, "ip": "1.2.3.4", "avg_ms": 12.0, "loss_pct": 0.0}],
-                         "locations": [None, None,
-                                       {"ip": "1.2.3.4", "lat": 51.5, "lon": -0.1,
-                                        "city": "London", "source": "ip-api",
-                                        "hostname": "edge.example.net"}]}}
+    traces = {
+        "london": {
+            "error": None,
+            "hops": [
+                {"n": 1, "ip": "192.168.1.1", "avg_ms": 1.0, "loss_pct": 0.0},
+                {"n": 2, "ip": None, "avg_ms": None, "loss_pct": None},
+                {"n": 3, "ip": "1.2.3.4", "avg_ms": 12.0, "loss_pct": 0.0},
+            ],
+            "locations": [
+                None,
+                None,
+                {
+                    "ip": "1.2.3.4",
+                    "lat": 51.5,
+                    "lon": -0.1,
+                    "city": "London",
+                    "source": "ip-api",
+                    "hostname": "edge.example.net",
+                },
+            ],
+        }
+    }
     html = build_report(run, traces)
     assert "every hop, and where the time goes" in html
     assert "edge.example.net" in html
@@ -111,11 +128,22 @@ def test_a_published_map_reads_the_world_from_the_site_not_a_cdn():
     from pingme.render_web import PLOTLY_ASSET, _plot_config
 
     run = json.loads(FIXTURE.read_text())
-    traces = {"london": {"error": None,
-                         "hops": [{"n": 1, "ip": "1.2.3.4", "avg_ms": 9.0, "loss_pct": 0.0}],
-                         "locations": [{"ip": "1.2.3.4", "lat": 51.5, "lon": -0.1,
-                                        "city": "London", "source": "ip-api",
-                                        "hostname": None}]}}
+    traces = {
+        "london": {
+            "error": None,
+            "hops": [{"n": 1, "ip": "1.2.3.4", "avg_ms": 9.0, "loss_pct": 0.0}],
+            "locations": [
+                {
+                    "ip": "1.2.3.4",
+                    "lat": 51.5,
+                    "lon": -0.1,
+                    "city": "London",
+                    "source": "ip-api",
+                    "hostname": None,
+                }
+            ],
+        }
+    }
     published = build_report(run, traces, plotly="external")
     assert '"topojsonURL": "../assets/"' in published
 
@@ -133,21 +161,36 @@ def _with_stalls():
     run = json.loads(FIXTURE.read_text())
     targets = run["analysis"]["targets"]
     targets["router"]["stalls"] = {
-        "threshold_ms": 30.0, "idle_mean_ms": 3.1, "spikes": 5,
-        "episodes": [{"at_s": 8.0, "length_s": 0.6, "probes": 4},
-                     {"at_s": 22.0, "length_s": 0.0, "probes": 1}],
-        "router_coincidence": None}
+        "threshold_ms": 30.0,
+        "idle_mean_ms": 3.1,
+        "spikes": 5,
+        "episodes": [
+            {"at_s": 8.0, "length_s": 0.6, "probes": 4},
+            {"at_s": 22.0, "length_s": 0.0, "probes": 1},
+        ],
+        "router_coincidence": None,
+    }
     targets["london"]["stalls"] = {
-        "threshold_ms": 30.0, "idle_mean_ms": 12.43, "spikes": 4,
+        "threshold_ms": 30.0,
+        "idle_mean_ms": 12.43,
+        "spikes": 4,
         "episodes": [{"at_s": 8.2, "length_s": 0.4, "probes": 3}],
-        "router_coincidence": 0.75}
+        "router_coincidence": 0.75,
+    }
     targets["us-east"]["stalls"] = {
-        "threshold_ms": 30.0, "idle_mean_ms": 88.0, "spikes": 0, "episodes": [],
-        "router_coincidence": None}
+        "threshold_ms": 30.0,
+        "idle_mean_ms": 88.0,
+        "spikes": 0,
+        "episodes": [],
+        "router_coincidence": None,
+    }
     targets["sao-paulo"]["stalls"] = {
-        "threshold_ms": 30.0, "idle_mean_ms": 210.0, "spikes": 3,
+        "threshold_ms": 30.0,
+        "idle_mean_ms": 210.0,
+        "spikes": 3,
         "episodes": [{"at_s": 5.0, "length_s": 0.2, "probes": 2}],
-        "router_coincidence": 0.0}
+        "router_coincidence": 0.0,
+    }
     return run
 
 
@@ -156,24 +199,36 @@ def test_the_busy_p95_says_how_many_probes_it_rests_on():
     run = json.loads(FIXTURE.read_text())
     london = run["analysis"]["targets"]["london"]
     penalty = london["busy"]["p95_ms"] - london["idle"]["p95_ms"]
-    assert (f"under-load penalty {penalty:+.0f} ms ({london['busy']['sent']} busy probes)"
-            in build_report(run))
+    assert (
+        f"under-load penalty {penalty:+.0f} ms ({london['busy']['sent']} busy probes)"
+        in build_report(run)
+    )
 
 
 def test_the_spike_fact_keeps_a_counted_zero_apart_from_an_uncounted_one():
     from pingme.render_web import _stall_fact
 
-    counted = {"threshold_ms": 30.0, "idle_mean_ms": 12.43, "spikes": 36,
-               "episodes": [], "router_coincidence": 0.75}
+    counted = {
+        "threshold_ms": 30.0,
+        "idle_mean_ms": 12.43,
+        "spikes": 36,
+        "episodes": [],
+        "router_coincidence": 0.75,
+    }
     assert _stall_fact({"stalls": counted}) == "spikes 36 (with a router stall: 75 %)"
     # the router is the witness, so it has no share of its own
-    assert _stall_fact({"stalls": {**counted, "router_coincidence": None}}) == \
-        "spikes 36 (with a router stall: —)"
+    assert (
+        _stall_fact({"stalls": {**counted, "router_coincidence": None}})
+        == "spikes 36 (with a router stall: —)"
+    )
     # it spiked and the router did not: a finding, and it must not read as a gap
-    assert _stall_fact({"stalls": {**counted, "router_coincidence": 0.0}}) == \
-        "spikes 36 (with a router stall: 0 %)"
-    assert _stall_fact({"stalls": {**counted, "spikes": 0}}) == \
-        "spikes 0 (with a router stall: 75 %)"
+    assert (
+        _stall_fact({"stalls": {**counted, "router_coincidence": 0.0}})
+        == "spikes 36 (with a router stall: 0 %)"
+    )
+    assert (
+        _stall_fact({"stalls": {**counted, "spikes": 0}}) == "spikes 0 (with a router stall: 75 %)"
+    )
     # a record saved before stalls were counted claims nothing at all
     assert _stall_fact({}) is None
     assert _stall_fact({"stalls": None}) is None
@@ -216,13 +271,19 @@ def test_a_stall_in_the_first_second_does_not_push_the_axis_before_zero():
     london = run["analysis"]["targets"]["london"]
     first = min(s[2] for s in london["samples"])
     last = max(s[2] for s in london["samples"])
-    shapes = _timeline(london, {}, [{"at_s": first + 0.02, "length_s": 0.0, "probes": 1},
-                                    {"at_s": last - 0.02, "length_s": 0.0, "probes": 1}]
-                       ).layout.shapes
+    shapes = _timeline(
+        london,
+        {},
+        [
+            {"at_s": first + 0.02, "length_s": 0.0, "probes": 1},
+            {"at_s": last - 0.02, "length_s": 0.0, "probes": 1},
+        ],
+    ).layout.shapes
     assert [(s.x0, s.x1) for s in shapes] == [(first, first + 1.02), (last - 1.02, last)]
     # a stall wholly outside this target's samples shades nothing at all
-    assert not _timeline(london, {}, [{"at_s": last + 50, "length_s": 0.0, "probes": 1}]
-                         ).layout.shapes
+    assert not _timeline(
+        london, {}, [{"at_s": last + 50, "length_s": 0.0, "probes": 1}]
+    ).layout.shapes
 
 
 def test_every_target_but_the_router_gets_the_band():
@@ -268,3 +329,71 @@ def test_the_route_verdict_says_it_is_the_closest_guess_not_a_measurement():
     assert _closest_of({}) == "closest of 0 routes considered"
     html = build_report(json.loads(FIXTURE.read_text()))
     assert "closest of 3 routes considered" in html  # sao-paulo, in its section and its tile
+
+
+# The fixture run started at 2026-08-29T21:02:51Z and lasted 30 s. Stamps either side of the
+# window that decides whether a route was traced with its run.
+_WITH_THE_RUN = "2026-08-29T21:05:00+00:00"
+_ELEVEN_DAYS_LATER = "2026-09-10T09:00:00+00:00"
+_LATE = "Traced on 2026-09-10, 11 days after this run, so it may not be the path the run took."
+_UNRECORDED = "When this route was traced was not recorded."
+
+
+def _one_route(traced_at=None):
+    entry = {
+        "error": None,
+        "hops": [{"n": 1, "ip": "1.2.3.4", "avg_ms": 9.0, "loss_pct": 0.0}],
+        "locations": [
+            {
+                "ip": "1.2.3.4",
+                "lat": 51.5,
+                "lon": -0.1,
+                "city": "London",
+                "source": "ip-api",
+                "hostname": None,
+            }
+        ],
+    }
+    if traced_at is not None:
+        entry["traced_at"] = traced_at
+    return {"london": entry}
+
+
+def test_a_route_traced_with_its_run_adds_nothing_to_the_page(monkeypatch):
+    """Byte for byte the page it would be if the date were never looked at."""
+    from pingme import render_web
+
+    run = json.loads(FIXTURE.read_text())
+    stamped = build_report(run, _one_route(_WITH_THE_RUN))
+    monkeypatch.setattr(render_web, "trace_notes", lambda run, traces: [])
+    assert stamped == build_report(run, _one_route(_WITH_THE_RUN))
+    assert '<p class="note">When' not in stamped
+    assert '<p class="note">Traced' not in stamped
+
+
+def test_a_route_with_no_date_says_so_rather_than_nothing():
+    """The em dash rule: a fact nobody recorded is never shown as the good case."""
+    run = json.loads(FIXTURE.read_text())
+    assert f'<p class="note">{_UNRECORDED}</p>' in build_report(run, _one_route())
+
+
+def test_a_route_traced_later_says_when():
+    run = json.loads(FIXTURE.read_text())
+    assert f'<p class="note">{_LATE}</p>' in build_report(run, _one_route(_ELEVEN_DAYS_LATER))
+
+
+def test_the_map_page_carries_the_same_sentence(monkeypatch, tmp_path):
+    """The map-only page has no prose around it, so the sentence goes in the subtitle."""
+    from pingme import render_map
+
+    monkeypatch.setattr(render_map, "data_dir", lambda: tmp_path)
+    monkeypatch.setattr(render_map.shutil, "which", lambda name: None)  # open no browser
+    run = json.loads(FIXTURE.read_text())
+    run["traces"] = _one_route(_ELEVEN_DAYS_LATER)
+    page = Path(render_map.build_map(run)).read_text(encoding="utf-8")
+    assert _LATE in page
+
+    run["traces"] = _one_route(_WITH_THE_RUN)
+    page = Path(render_map.build_map(run)).read_text(encoding="utf-8")
+    assert "Traced on" not in page
+    assert _UNRECORDED not in page
