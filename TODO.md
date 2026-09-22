@@ -83,6 +83,11 @@ Last updated: 2026-09-10
       (checked 2026-09-03 via the API). Recommendation: leave it ignored. CLAUDE.md
       already ranks TODO.md and PLAN.md above snapshots, and the wrap-up copies each
       decision with its reasoning into `notes/plans/`, which is tracked
+- [ ] Move the route-date grace period into the tokens block. `TRACE_WITH_RUN_GRACE_S`
+      is written as a literal in `map.js` as well as in `render_map.py`, the one number on
+      the site that does not come from Python. Drift cannot go unseen (the shared cases in
+      `tests/fixtures/trace-note-cases.json` test both sides of the boundary), but moving
+      it changes `traceNote`'s arguments, which every shared case calls. Found 2026-09-22
 - [ ] Add a favicon to the site. `favicon.ico` is 404 on every load, one console error
 - [ ] Live refreshing display (htop-style) instead of run-draw-exit
 - [ ] IPv6 traces (Three shows its IPv6 hops; the relays are IPv4 only)

@@ -13,7 +13,7 @@ somebody reading the log from another program without reading pingme's source.
 
 ## The version number
 
-    "schema": 1
+    "schema": 2
 
 Every run written from 2026-09-04 onwards carries this. It is an integer and it says
 which shape the rest of the line is in.

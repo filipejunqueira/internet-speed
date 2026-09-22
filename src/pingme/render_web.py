@@ -426,6 +426,7 @@ table.hops td:nth-child(2),table.hops td:nth-child(3),table.hops td:nth-child(4)
 table.hops tr.quiet td{{text-align:left;color:var(--muted)}} table.hops small{{color:var(--muted)}}
 .error{{color:{STATUS['critical']}}} .quiet{{color:var(--muted)}}
 .foot{{color:var(--muted);font-size:12px;margin-top:20px}}
+.note{{color:var(--muted);font-size:12px;margin:6px 0 0}}
 .plotly-graph-div{{width:100%}}
 """
 

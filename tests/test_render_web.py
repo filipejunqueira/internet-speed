@@ -308,7 +308,11 @@ def test_a_route_with_no_date_says_so_rather_than_nothing():
 
 def test_a_route_traced_later_says_when():
     run = json.loads(FIXTURE.read_text())
-    assert f'<p class="note">{_LATE}</p>' in build_report(run, _one_route(_ELEVEN_DAYS_LATER))
+    page = build_report(run, _one_route(_ELEVEN_DAYS_LATER))
+    assert f'<p class="note">{_LATE}</p>' in page
+    # Styled on the report page itself, not only in the explorer's stylesheet, or the
+    # sentence reads as body text rather than a caption under the map.
+    assert ".note{color:var(--muted)" in page.split("</style>")[0]
 
 
 def test_the_map_page_carries_the_same_sentence(monkeypatch, tmp_path):
