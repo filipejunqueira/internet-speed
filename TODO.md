@@ -1,8 +1,12 @@
 # TODO — internet-speed
 
-Last updated: 2026-09-10
+Last updated: 2026-09-23
 
 ## Now
+
+The first two items are PLAN.md, the route date. Steps 1 to 4 are done and tested;
+step 5 (a real `--quick --web` run, republishing the 13:59 run, reading the live page)
+is left for a later session.
 
 - [ ] Decide what to do about the map on `leeds_bt_2026-08-30T13-59-15Z`. Publishing it
       on 2026-09-10 re-traced the route, because the record carries no trace, and the
@@ -84,8 +88,9 @@ Last updated: 2026-09-10
       already ranks TODO.md and PLAN.md above snapshots, and the wrap-up copies each
       decision with its reasoning into `notes/plans/`, which is tracked
 - [ ] Move the route-date grace period into the tokens block. `TRACE_WITH_RUN_GRACE_S`
-      is written as a literal in `map.js` as well as in `render_map.py`, the one number on
-      the site that does not come from Python. Drift cannot go unseen (the shared cases in
+      is written as a literal in `map.js` as well as in `render_map.py`, hand-copied from
+      Python like `COLLAPSE_DEG` and `REFERENCE_POINTS` beside it, against the tokens
+      rule. Drift cannot go unseen (the shared cases in
       `tests/fixtures/trace-note-cases.json` test both sides of the boundary), but moving
       it changes `traceNote`'s arguments, which every shared case calls. Found 2026-09-22
 - [ ] Add a favicon to the site. `favicon.ico` is 404 on every load, one console error
@@ -96,6 +101,16 @@ Last updated: 2026-09-10
 - [ ] Scheduled background runs
 
 ## Done
+- 2026-09-22 — The route date, steps 3 and 4 of PLAN.md. Every trace entry carries
+  `traced_at` (schema 2), and a route traced later than its run says so under the map on
+  the report page, on the map-only page and in the explorer caption. The code had landed
+  untested in the 2026-09-13 wip commit; tests added (dd870f8), including one showing
+  a with-the-run trace adds no bytes to the report (checked once by `cmp` against the
+  pre-plan code, before the `.note` style was added). A global hook now runs `ruff format`
+  after shell edits too, which rewrote two test files; `[tool.ruff.format] exclude` stops
+  it for this project and the files were restored (3ac048c). A review pass found the note
+  unstyled on the report page, fixed with a test (78e7a8f). The desktop clone was pulled.
+
 - 2026-09-13 — Claude switched this repository to SSH on 2026-09-13. Outstanding work was committed as-is so nothing was left uncommitted.
   Why: an HTTPS remote cannot push from the claude-sandbox container, which has no git credential helper and does not read the host's git config. SSH works there with no setup. Original remote URLs are recorded in the claude-config repo at notes/remote-urls-before-2026-09-13.txt.
 

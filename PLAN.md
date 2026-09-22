@@ -125,8 +125,8 @@ Conditions the change must never break, each with the check that holds it:
 - Step 5 republishes the 13:59 run, which writes to the live site. Approving this plan is
   the yes for that one publish. Rollback: `git revert HEAD` in the site clone at
   `~/.local/share/pingme/site` (container copy) and push.
-- Python edits go through the shell, never Edit or Write: the ruff-format hook would
-  rewrite the file (CLAUDE.md corrections log).
+- Python edits: since 3ac048c `pyproject.toml` excludes this project from `ruff format`,
+  so the hooks no longer rewrite a file whichever tool edits it (CLAUDE.md corrections log).
 - The 13:59 run's fresh trace will again be the container's route, not Leeds. The page
   will now say so, which is the point.
 
@@ -173,7 +173,11 @@ Named together in one message when they are all true, per CLAUDE.md:
         also checked once against the code as it stood at c2fd266: the same fixture and a
         with-the-run trace built a 4,353,693-byte report, identical under `cmp`. Gate:
         ruff clean, pytest 130 passed, node 164 passed. `mapNoteText` in `app.js` has no
-        test of its own; the live explorer read in step 5 is its check.
+        test of its own; the live explorer read in step 5 is its check. A review pass
+        found the report page's `.note` had no style (only the explorer's stylesheet had
+        the rule); fixed with a test in 78e7a8f. That rule is unconditional, so reports are no
+        longer byte-identical to c2fd266; invariant 1 now means identical to the same code with
+        the note switched off, which the committed test holds.
 - [ ] 5. Gate; a real `--quick --web` run; republish the 13:59 run; read the live page;
         archive this plan and write TODO.md.
 

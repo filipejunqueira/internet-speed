@@ -15,8 +15,8 @@ somebody reading the log from another program without reading pingme's source.
 
     "schema": 2
 
-Every run written from 2026-09-04 onwards carries this. It is an integer and it says
-which shape the rest of the line is in.
+Every run written from 2026-09-04 onwards carries a number; 2 since 2026-09-10. It is
+an integer and it says which shape the rest of the line is in.
 
 **No `schema` key at all means the run was saved before versioning existed.** Those
 lines are still perfectly good; they simply lack the fields marked "new in 1" below.
