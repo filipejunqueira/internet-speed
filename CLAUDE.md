@@ -102,10 +102,13 @@ they are wired in.
 - `ping` in Claude's shell is an alias to `gping`, which the container does not have.
   Call `/usr/bin/ping` when testing by hand; the code uses `shutil.which`, which is
   unaffected (2026-09-03).
-- A PostToolUse hook runs `ruff format` on every file written with Edit or Write. This
-  codebase is not ruff-formatted (it uses hanging indents), so that would rewrite about
-  993 lines across `src/pingme/`. Make Python edits through the shell instead, then run
-  `uv run ruff check .`, which is the project's actual gate (2026-09-03).
+- Global hooks run `ruff format --force-exclude` on Python files after Edit and Write, and
+  after every Bash command on any `.py` changed in the last 20 seconds. This codebase is not
+  ruff-formatted (it uses hanging indents), so that would rewrite whole files. Editing
+  through the shell stopped protecting it once the Bash hook arrived: commit dd870f8
+  reformatted two test files that way. `pyproject.toml` now sets `[tool.ruff.format]
+  exclude = ["*"]`, which the hooks honour, so any tool is safe here again.
+  `uv run ruff check .` is the project's actual gate (2026-09-03, updated 2026-09-22).
 - `node --test tests/js/` does not walk a directory on node 26: it tries to load the path as
   a module and fails. Pass the glob, `node --test "tests/js/*.test.js"` (2026-09-03).
 - The map topology comes from `cdn.plot.ly/un/world_110m.json`, not the older

@@ -16,9 +16,8 @@ import pytest
 
 from pingme.render_map import TRACE_WITH_RUN_GRACE_S, trace_note
 
-CASES = json.loads(
-    (Path(__file__).parent / "fixtures" / "trace-note-cases.json").read_text(encoding="utf-8")
-)["cases"]
+CASES = json.loads((Path(__file__).parent / "fixtures" / "trace-note-cases.json")
+                   .read_text(encoding="utf-8"))["cases"]
 
 
 def test_the_cases_file_is_not_empty():
@@ -46,19 +45,14 @@ def test_trace_run_stamps_every_route_with_one_moment(monkeypatch):
     from pingme import render_map
     from pingme.trace import Hop
 
-    monkeypatch.setattr(
-        render_map, "trace", lambda ip: ([Hop(n=1, ip=None, avg_ms=None, loss_pct=None)], None)
-    )
+    monkeypatch.setattr(render_map, "trace",
+                        lambda ip: ([Hop(n=1, ip=None, avg_ms=None, loss_pct=None)], None))
     monkeypatch.setattr(render_map, "locate", lambda *a: None)
-    run = {
-        "analysis": {"origin": [53.8, -1.76]},
-        "targets": [
-            {"name": "router", "ip": "192.168.1.1", "kind": "gateway"},
-            {"name": "isp-hop", "ip": "10.0.0.1", "kind": "isp-hop"},
-            {"name": "london", "ip": "192.0.2.1", "kind": "relay"},
-            {"name": "madrid", "ip": "192.0.2.2", "kind": "relay"},
-        ],
-    }
+    run = {"analysis": {"origin": [53.8, -1.76]},
+           "targets": [{"name": "router", "ip": "192.168.1.1", "kind": "gateway"},
+                       {"name": "isp-hop", "ip": "10.0.0.1", "kind": "isp-hop"},
+                       {"name": "london", "ip": "192.0.2.1", "kind": "relay"},
+                       {"name": "madrid", "ip": "192.0.2.2", "kind": "relay"}]}
 
     before = dt.datetime.now(dt.UTC)
     traces = render_map.trace_run(run)

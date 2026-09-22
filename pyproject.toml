@@ -29,6 +29,12 @@ dev = ["pytest>=8", "ruff>=0.6"]
 line-length = 100
 target-version = "py312"
 
+[tool.ruff.format]
+# This codebase uses hanging indents and is not ruff-formatted. A global hook runs
+# `ruff format --force-exclude` on every Python file an edit touches, which would rewrite
+# whole files; excluding everything here makes that a no-op. `ruff check` still applies.
+exclude = ["*"]
+
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
 
