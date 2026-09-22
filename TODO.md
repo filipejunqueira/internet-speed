@@ -8,15 +8,6 @@ The first two items are PLAN.md, the route date. Steps 1 to 4 are done and teste
 step 5 (a real `--quick --web` run, republishing the 13:59 run, reading the live page)
 is left for a later session.
 
-- [ ] Add a corrections-log line to CLAUDE.md naming the three run logs (container,
-      laptop terminal, desktop via `ssh desktop`) and which runs each holds; a republish
-      only finds a run in the log that holds it. Text is in the auto-memory entry
-      `laptop-desktop-and-three-logs`. Agreed 2026-09-23, do next session
-
-- [ ] Fix the global `~/.claude/rules/python.md`: it still says to edit Python through the
-      shell, which stopped protecting anything once the Bash hook began running
-      `ruff format`. Agreed 2026-09-23, do next session
-
 - [ ] Decide what to do about the map on `leeds_bt_2026-08-30T13-59-15Z`. Publishing it
       on 2026-09-10 re-traced the route, because the record carries no trace, and the
       trace ran on the container's network today rather than the Leeds BT line the run
@@ -110,6 +101,11 @@ is left for a later session.
 - [ ] Scheduled background runs
 
 ## Done
+- 2026-09-23 — The two config fixes agreed last session. CLAUDE.md's corrections log now
+  names the three run logs and which runs each holds. The global `rules/python.md` no longer
+  says to edit Python through the shell; it names the Bash hook and the
+  `[tool.ruff.format] exclude` fix instead (claude-config repo).
+
 - 2026-09-22 — The route date, steps 3 and 4 of PLAN.md. Every trace entry carries
   `traced_at` (schema 2), and a route traced later than its run says so under the map on
   the report page, on the map-only page and in the explorer caption. The code had landed
