@@ -118,10 +118,14 @@ they are wired in.
   rather than only move where they come from. Reasoning in `publish.fetch_topojson`
   (2026-09-04).
 - plotext 6 is a rewrite; the code targets 5.x, pinned `<6` (2026-08-29).
-- There are three run logs, each with its own site clone, and `publish` or `compare` only
-  finds a run in the log that holds it. The container's (`~/containers/claude-home/.local/share/pingme`,
-  what `uv run pingme` in Claude's shell uses) holds `leeds_bt_2026-08-30T13-59-15Z` and
-  the check runs. The laptop terminal's (`/home/filipejunqueira/.local/share/pingme`) holds
-  `leeds_bt` 15-15 and 15-32 and the santander and apolinho runs. The desktop's
-  (`ssh desktop`, its own clone at `~/code/internet-speed`, which does not pull by itself)
-  holds the 2026-09-21 run and `k-nodes-desktop-cable_2026-09-22T00-19-03Z` (2026-09-22).
+- There are three run logs, and `publish` or `compare` only
+  finds a run in the log that holds it. The container's
+  (`/home/filipejunqueira/containers/claude-home/.local/share/pingme`, what `uv run pingme`
+  in Claude's shell uses) holds `leeds_bt_2026-08-30T13-59-15Z` and the check runs. The
+  laptop terminal's (`/home/filipejunqueira/.local/share/pingme`) holds `leeds_bt` 15-15 and
+  15-32, `baseline-day-santander`, `baseline-apolinho` and the unlabelled
+  `2026-09-03T13-14-53Z`. The desktop's (`ssh desktop`, its own clone at
+  `~/code/internet-speed`, which does not pull by itself) holds `2026-09-21T14-51-12Z`,
+  `k-nodes-desktop-cable_2026-09-22T00-19-03Z` and `mudfish105-late_2026-09-22T22-55-48Z`.
+  The container and the laptop each have a site clone beside the log; the desktop has none,
+  so it has never published. Read from each machine on 2026-09-23.
