@@ -131,11 +131,11 @@ export function penaltyFigure(runs, tokens) {
     })
     // The label is muted text, not the line's colour: a threshold is chrome, not a series.
     layout.annotations.push({
-      x: value, xref: 'x', y: 1, yref: 'paper', text: label, showarrow: false,
-      xanchor: 'left', yanchor: 'bottom', font: { size: 10, color: chrome.muted }
+      x: value, xref: 'x', ...labelRow(0), text: label, showarrow: false,
+      xanchor: 'left', font: { size: 10, color: chrome.muted }
     })
   }
-  return { data: figure.data, layout }
+  return { data: figure.data, layout: withLabelRows(layout, 1) }
 }
 
 /**
@@ -230,7 +230,7 @@ export function timelineFigure(run, slot, target, yRange, tokens) {
   const bands = phaseBands(run, chrome)
   layout.shapes = bands.shapes
   layout.annotations = bands.annotations
-  return { data, layout }
+  return { data, layout: withLabelRows(layout, 2) }
 }
 
 /**
@@ -315,19 +315,49 @@ function phaseBands(run, chrome) {
   const annotations = []
   // Grey, not the download and upload hues the run pages use, because in this view colour
   // is already saying which run a mark belongs to and it cannot say two things at once.
-  for (const [name, start, end] of [['download', marks.download, marks.upload],
-    ['upload', marks.upload, marks['idle-again']]]) {
+  // Each name has a row of its own, download above upload: on a phone the upload band
+  // starts a few pixels after download's, and on one row the two names ran together.
+  for (const [name, start, end, row] of [['download', marks.download, marks.upload, 1],
+    ['upload', marks.upload, marks['idle-again'], 0]]) {
     if (!isNumber(start) || !isNumber(end)) continue
     shapes.push({
       type: 'rect', xref: 'x', yref: 'paper', x0: start, x1: end, y0: 0, y1: 1,
       fillcolor: wash(chrome.muted, BAND_WASH), line: { width: 0 }, layer: 'below'
     })
     annotations.push({
-      x: start, xref: 'x', y: 1, yref: 'paper', text: name, showarrow: false,
-      xanchor: 'left', yanchor: 'bottom', font: { size: 10, color: chrome.muted }
+      x: start, xref: 'x', ...labelRow(row), text: name, showarrow: false,
+      xanchor: 'left', font: { size: 10, color: chrome.muted }
     })
   }
   return { shapes, annotations }
+}
+
+// One row of labels above the plot: a 10 px label and its box. The legend, when there is
+// one, keeps a gap above the top row, because its text box reaches a little below its foot.
+const LABEL_ROW_PX = 14
+const LEGEND_GAP_PX = 8
+
+/** Where a label belonging to a line or a band goes: row 0 sits on the plot's top edge. */
+function labelRow(row) {
+  return { y: 1, yref: 'paper', yanchor: 'bottom', yshift: row * LABEL_ROW_PX }
+}
+
+/**
+ * Make room above the plot for `rows` rows of labels, and lift the legend above them.
+ *
+ * The labels are placed in pixels, but a legend only in fractions of the plot's height, so
+ * the fraction is worked out from the height this figure is built at. Without a legend the
+ * first row uses the room the legend would have had.
+ */
+function withLabelRows(layout, rows) {
+  const legend = layout.showlegend
+  layout.margin = { ...layout.margin, t: layout.margin.t + (legend ? rows : rows - 1) * LABEL_ROW_PX }
+  if (legend) {
+    const plotPx = layout.height - layout.margin.t - layout.margin.b
+    layout.legend = { ...layout.legend, yanchor: 'bottom',
+      y: 1 + (rows * LABEL_ROW_PX + LEGEND_GAP_PX) / plotPx }
+  }
+  return layout
 }
 
 /** The chrome every figure shares: transparent, tight margins, a hairline grid, no title. */

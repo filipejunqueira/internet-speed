@@ -176,7 +176,13 @@ Approved 2026-09-24 as recommended: decisions 1 to 3 as written, and decision 4 
 
 ### Part C — explorer charts
 
-**Step 4. Label rows: the busy-delay thresholds and the timeline phase names**
+**Step 4. Label rows: the busy-delay thresholds and the timeline phase names — DONE**
+- Done: `labelRow(n)` puts a label n rows of 14 px above the plot's top edge, by pixel
+  shift; `withLabelRows` grows the top margin and lifts the legend clear of the rows plus
+  an 8 px gap (the legend's text box reaches below its foot). Thresholds on row 0 under the
+  legend; download row 1, upload row 0. Local: 0 pairs in "Extra delay…" and "… through each
+  run" at both widths, explorer states 63 to 39 pairs. At 390 px the three-name legend
+  wraps to two lines and grows upward, clear of the labels (screenshot read). Node: 172.
 - Needs: step 1; `figures.js` `baseLayout`, `penaltyFigure`, `phaseBands`;
   `tests/js/figures.test.js`
 - Thinking: medium — main session

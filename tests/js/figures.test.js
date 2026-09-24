@@ -332,3 +332,26 @@ test('themeTextUpdate repaints every piece of chrome text for the theme in force
   // A figure with no annotations is not handed an empty list to replace its own with.
   assert.equal('annotations' in themeTextUpdate({}, TOKENS, true), false)
 })
+
+test('labels on lines and bands get rows of their own above the plot, under any legend', () => {
+  // A row is 14 px: a 10 px label and its box. The legend used to sit 1.08 of the plot's
+  // height up, which is about 16 px, and the threshold labels reached into it.
+  const plotPx = (layout) => layout.height - layout.margin.t - layout.margin.b
+  const penalty = penaltyFigure([RUN_A, RUN_B], TOKENS).layout
+  for (const note of penalty.annotations) {
+    assert.equal(note.yref, 'paper')
+    assert.equal(note.y, 1)
+    assert.equal(note.yanchor, 'bottom')
+    assert.equal(note.yshift, 0)
+  }
+  // the legend's foot clears the label row, with room to spare, and the margin holds both
+  assert.equal(penalty.legend.yanchor, 'bottom')
+  assert.ok((penalty.legend.y - 1) * plotPx(penalty) >= 14 + 8)
+  assert.ok(penalty.margin.t >= 24 + 14)
+  // The phases share one row no longer: download above, upload a row below it, both clear
+  // of the plot, because on a phone the upload band starts a few pixels after download's.
+  const timeline = timelineFigure(RUN_B, 2, 'london', [0, 60], TOKENS).layout
+  const shift = Object.fromEntries(timeline.annotations.map(note => [note.text, note.yshift]))
+  assert.deepEqual(shift, { download: 14, upload: 0 })
+  assert.ok(timeline.margin.t >= 2 * 14)
+})
