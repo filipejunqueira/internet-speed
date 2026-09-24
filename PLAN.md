@@ -143,7 +143,10 @@ Approved 2026-09-24 as recommended: decisions 1 to 3 as written, and decision 4 
 
 ### Part B — names
 
-**Step 2. `distinctNames`, tested first**
+**Step 2. `distinctNames`, tested first — DONE**
+- Done: `dom.distinctNames` with six hand-worked cases, written and failing before the
+  function existed. One case beyond the plan's list: two runs in one minute beside a third
+  on another day get the day and the seconds. `node --test "tests/js/*.test.js"`: 170 passed.
 - Needs: decision 1; `dom.js`; `tests/js/dom.test.js`
 - Thinking: medium — main session
 - Check: `node --test "tests/js/dom.test.js"`, with cases for three runs on one day, two on

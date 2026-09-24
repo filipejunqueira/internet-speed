@@ -8,8 +8,8 @@ import {test} from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
-  burstText, chartCard, detailFrame, diffTable, emptyCard, esc, fmt, hopTable, pickerTable,
-  prettyTarget, refusedNote, runName, runTiles, shortName, swatch, targetSelector
+  burstText, chartCard, detailFrame, diffTable, distinctNames, emptyCard, esc, fmt, hopTable,
+  pickerTable, prettyTarget, refusedNote, runName, runTiles, shortName, swatch, targetSelector
 } from '../../src/pingme/site/dom.js'
 
 const DASH = '—'
@@ -383,4 +383,63 @@ test('target names are written the way a person would write them', () => {
   assert.equal(prettyTarget('isp-hop'), 'isp hop')
   assert.equal(prettyTarget('router'), 'router')
   assert.equal(prettyTarget('nowhere'), 'nowhere', 'an unknown target keeps its own name')
+})
+
+test('distinctNames adds the time when runs sharing a label share a date', () => {
+  // The three Leeds runs in the log, all from one afternoon.
+  const names = distinctNames([
+    {id: 'a', label: 'leeds_bt', timestamp: '2026-08-30T13:59:15.284226+00:00'},
+    {id: 'b', label: 'leeds_bt', timestamp: '2026-08-30T15:15:01.826239+00:00'},
+    {id: 'c', label: 'leeds_bt', timestamp: '2026-08-30T15:32:20.528706+00:00'}
+  ])
+  assert.deepEqual([...names.values()], ['leeds_bt 13:59', 'leeds_bt 15:15', 'leeds_bt 15:32'])
+})
+
+test('distinctNames adds the date when every run sharing a label is on a day of its own', () => {
+  // Same minute on two days: the time would say nothing, the date says it all.
+  const names = distinctNames([
+    {id: 'a', label: 'leeds_bt', timestamp: '2026-08-30T13:59:15+00:00'},
+    {id: 'b', label: 'leeds_bt', timestamp: '2026-09-02T13:59:40+00:00'}
+  ])
+  assert.deepEqual([...names.values()], ['leeds_bt 30 Aug', 'leeds_bt 2 Sep'])
+})
+
+test('distinctNames adds both when some share a day and some do not', () => {
+  const names = distinctNames([
+    {id: 'a', label: 'leeds_bt', timestamp: '2026-08-30T13:59:15+00:00'},
+    {id: 'b', label: 'leeds_bt', timestamp: '2026-08-30T15:15:01+00:00'},
+    {id: 'c', label: 'leeds_bt', timestamp: '2026-09-02T10:00:00+00:00'}
+  ])
+  assert.deepEqual([...names.values()],
+    ['leeds_bt 30 Aug 13:59', 'leeds_bt 30 Aug 15:15', 'leeds_bt 2 Sep 10:00'])
+})
+
+test('distinctNames reaches for the seconds when two runs share a minute', () => {
+  const names = distinctNames([
+    {id: 'a', label: 'x', timestamp: '2026-08-30T13:59:15+00:00'},
+    {id: 'b', label: 'x', timestamp: '2026-08-30T13:59:45+00:00'}
+  ])
+  assert.deepEqual([...names.values()], ['x 13:59:15', 'x 13:59:45'])
+  // and when a third run is on another day, every one of them says its day as well
+  const mixed = distinctNames([
+    {id: 'a', label: 'x', timestamp: '2026-08-30T13:59:15+00:00'},
+    {id: 'b', label: 'x', timestamp: '2026-08-30T13:59:45+00:00'},
+    {id: 'c', label: 'x', timestamp: '2026-09-02T10:00:00+00:00'}
+  ])
+  assert.deepEqual([...mixed.values()], ['x 30 Aug 13:59:15', 'x 30 Aug 13:59:45', 'x 2 Sep 10:00:00'])
+})
+
+test('distinctNames leaves alone every run whose name clashes with nothing', () => {
+  const names = distinctNames([
+    {id: '2026-09-03T13-14-53Z', label: null, timestamp: '2026-09-03T13:14:53+00:00'},
+    {id: 'b', label: 'leeds_bt', timestamp: '2026-08-30T13:59:15+00:00'},
+    {id: 'c', label: 'leeds_bt', timestamp: '2026-08-30T15:15:01+00:00'},
+    {id: 'd', label: 'santander', timestamp: '2026-09-01T09:00:00+00:00'}
+  ])
+  // an unlabelled run is named by its id, which no other run can share
+  assert.equal(names.get('2026-09-03T13-14-53Z'), '2026-09-03T13-14-53Z')
+  assert.equal(names.get('d'), 'santander')
+  assert.equal(names.get('b'), 'leeds_bt 13:59')
+  assert.equal(names.get('c'), 'leeds_bt 15:15')
+  assert.deepEqual(distinctNames([]), new Map())
 })
