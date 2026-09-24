@@ -192,7 +192,10 @@ Approved 2026-09-24 as recommended: decisions 1 to 3 as written, and decision 4 
 - Parallel: yes, beside steps 8 and 9 — JavaScript files only; inside its branch,
   `figures.js` is step 5's next
 
-**Step 5. Histogram without the peak labels**
+**Step 5. Histogram without the peak labels — DONE**
+- Done: the histogram's outlines are `mode: 'lines'` with no text; the test that asserted
+  the peak names now asserts their absence and the legend. Local: 0 pairs in "Where the
+  round trips … fell" at both widths; explorer states 39 to 28, all on the map. Node: 172.
 - Needs: decision 2; `figures.js` `histogramFigure`
 - Thinking: light — main session
 - Check: a node test that the histogram's traces carry no text and the legend is shown for

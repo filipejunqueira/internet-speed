@@ -209,9 +209,14 @@ test('the histogram puts both runs on the same bins', () => {
   assert.equal(figure.data[0].x[figure.data[0].x.length - 1], 52.5)
   assert.equal(figure.data[0].line.shape, 'hv')
   assert.equal(figure.data[0].line.width, 2)
-  // Each run's own name written on its peak, so identity never rests on colour alone.
-  assert.ok(figure.data[0].text.includes('leeds'))
-  assert.ok(figure.data[1].text.includes('santander'))
+  // No name written at a peak: runs on one line peak in the same bin, so the names stacked
+  // on each other. The legend names them instead, whenever two or more are drawn.
+  for (const trace of figure.data) {
+    assert.equal(trace.mode, 'lines')
+    assert.equal(trace.text, undefined)
+  }
+  assert.equal(figure.layout.showlegend, true)
+  assert.deepEqual(figure.data.map(trace => trace.name), ['leeds', 'santander'])
 })
 
 test('the histogram of a target nobody measured is empty rather than broken', () => {

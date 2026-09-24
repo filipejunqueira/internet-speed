@@ -164,9 +164,11 @@ export function histogramFigure(runs, target, tokens) {
     const label = esc(runName(run))
     const counts = binCounts(run, target, bins)
     if (!counts.some(count => count > 0)) return
-    const peak = counts.indexOf(Math.max(...counts))
+    // No name at the peak: runs made on one line peak in the same bin, and three names
+    // stacked there named nothing. The dataviz rule for converging series is to fall back
+    // to the legend and the hover text, and a comparison always has its legend.
     data.push({
-      type: 'scatter', mode: 'lines+text',
+      type: 'scatter', mode: 'lines',
       // One point per bin edge, held flat across the bin by the "hv" shape; the closing
       // zero draws the right-hand wall of the last bin.
       x: bins.edges.slice(), y: counts.concat([0]),
@@ -175,8 +177,6 @@ export function histogramFigure(runs, target, tokens) {
       // outline with it, and the page's theme swap only restyles line and marker colours,
       // so this fill keeps its light-mode hue. At a tenth, that is invisible either way.
       fill: 'tozeroy', fillcolor: wash(colour, WASH),
-      text: counts.map((_, j) => (j === peak ? label : '')).concat(['']),
-      textposition: 'top right', textfont: { size: 11, color: chrome.ink2 },
       name: label, legendgroup: `run${slot}`, showlegend: list.length > 1,
       hovertemplate: `%{x:.1f} ms: %{y} probes<extra>${label}</extra>`,
       meta: { role: `run${slot}` }
