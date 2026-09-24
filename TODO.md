@@ -17,6 +17,12 @@ No plan is open. The site was walked on 2026-09-24; what it found is in
       three Leeds runs now disagree with each other in the same table. The other two are
       in the user's log: `pingme publish leeds_bt_2026-08-30T15-32` and `...15-15` from
       their terminal would bring them into line.
+      Since 2026-09-24 that also brings their report pages in line with the explorer.
+      Those pages were built before the route date and say nothing under the map, while
+      the explorer says "When this route was traced was not recorded." for the same runs.
+      `pingme publish 2026-09-03T13-14` (also in the user's log) needs the same. Publish
+      from a clone level with master: the desktop, at 3ac048c, lacks only the `.note`
+      style (78e7a8f), so its pages would carry the sentence unstyled.
       The same cause shows an em dash in the duration column for runs whose record does
       carry 60 s. Separate from this, the records themselves hold the old per-phase sent
       counts (São Paulo idle reads 34 % loss on the Leeds runs). The site never shows a
@@ -52,7 +58,7 @@ Found by the site walk on 2026-09-24; evidence in `notes/site-walk-2026-09-24/`.
 - [ ] Dark mode: the explorer's chart legends and axis titles stay `#52514e`, 2.2:1 on the
       dark card, nearly invisible. The report pages' axis titles look as dim (not measured)
 - [ ] Light mode: every caption is `#898781` at 12 px, 3.5:1 on the card, under the 4.5:1
-      WCAG AA asks of small text. The route-date sentence is one of them
+      floor the web accessibility guidelines set for small text. The route-date sentence is one of them
 - [ ] Phone: the explorer's map keeps its desktop height, so two thirds of its card is blank
 - [ ] Throughput: the 13:59 report's upload line sits at zero for its last two seconds, and
       the 2026-09-03 one ends on a zero; both read as the line failing. Find out why first

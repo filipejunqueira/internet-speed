@@ -29,7 +29,8 @@ the other 143 of the 150 taken stayed in the session's scratchpad.
    charts keep their light-mode text colour in dark mode. On the report pages the legend
    does switch to white, but the axis titles look just as dim (seen, not measured).
 2. **Light mode, every caption.** The muted colour `#898781` at 12 px on the `#fcfcfb` card
-   is 3.5:1, under the 4.5:1 that WCAG AA asks of small text. Every note under a chart is
+   is 3.5:1, under the 4.5:1 floor the web accessibility guidelines (WCAG, level AA) set
+   for small text. Every note under a chart is
    in it, the new route-date sentence included. Dark mode passes at 4.85:1.
 3. **Report pages, every histogram.** The "median" and "p95" labels at the top of the two
    dashed lines print on top of the legend (`report-histogram.png`). Same family as the
