@@ -4,8 +4,11 @@ Last updated: 2026-09-24
 
 ## Now
 
-No plan is open. The site was walked on 2026-09-24; what it found is in
-`notes/site-walk-2026-09-24/README.md`, with the new problems under Next.
+PLAN.md is open: no text over text on the site, and every run named apart. It covers the
+label-collision and duplicate-name items below and the phone-map item under Next. Steps
+1 to 8 and 11 are done and pushed; step 9 (the report map) and step 10 (check, publish,
+archive) are left, and none of it is on the live site yet. The site walk of 2026-09-24 is
+in `notes/site-walk-2026-09-24/README.md`.
 
 - [ ] Decide what to do about an old row in `runs/index.json` keeping numbers the code
       no longer agrees with. The table shows 100.0 % worst loss for the three Leeds runs
