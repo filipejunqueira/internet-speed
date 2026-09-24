@@ -186,9 +186,9 @@ def test_the_tokens_block_carries_three_run_slots_and_every_key(site):
     tokens = _tokens((site["dir"] / "index.html").read_text())
     assert set(tokens) == {"runSlots", "chrome", "status", "targetOrder", "thresholds",
                            "intervalS", "maxRuns", "font", "topojsonUrl", "labelSide"}
-    # the side of its end point each relay's map label goes, one table for both maps
+    # the side of its point each named place's map label goes, one table for both maps
     assert tokens["labelSide"] == LABEL_SIDE
-    assert set(LABEL_SIDE) == {"london", "madrid", "us-east", "sao-paulo"}
+    assert set(LABEL_SIDE) == {"london", "madrid", "us-east", "sao-paulo", "New York"}
     # three is the cap because a fourth hue fails the colour-blindness check on the map
     assert len(tokens["runSlots"]["light"]) == len(tokens["runSlots"]["dark"]) == 3
     assert tokens["maxRuns"] == 3

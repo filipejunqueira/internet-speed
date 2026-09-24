@@ -20,7 +20,9 @@ const TOKENS = {
     dark: { surface: '#1a1a19', page: '#0d0d0d', ink: '#ffffff', ink2: '#c3c2b7',
       muted: '#898781', grid: '#2c2c2a', axis: '#383835', border: 'rgba(255,255,255,0.10)' }
   },
-  font: 'system-ui, sans-serif'
+  font: 'system-ui, sans-serif',
+  labelSide: { london: 'middle right', madrid: 'middle right', 'us-east': 'top left',
+    'sao-paulo': 'middle right', 'New York': 'bottom right' }
 }
 
 const LEEDS = [53.8, -1.76]
@@ -231,8 +233,9 @@ test('the map costs a bounded number of traces however long the routes are', () 
     const { data } = mapFigure(runs, 'sao-paulo', TOKENS)
     const legs = data.filter(t => t.mode === 'lines')
     assert.ok(legs.length <= 4, `${hops} hops: ${legs.length} line traces, ceiling is 4`)
-    // Four lines, two sets of points, the cable landings and the shared origin star.
-    assert.ok(data.length <= 8, `${hops} hops: ${data.length} traces, ceiling is 8`)
+    // Four lines, two sets of points, the cable landings, the shared origin star and the
+    // one label at the shared end.
+    assert.ok(data.length <= 9, `${hops} hops: ${data.length} traces, ceiling is 9`)
   }
 })
 
@@ -300,6 +303,9 @@ test('the cable landings and the origin star are always drawn', () => {
   const cables = data.find(t => t.name === 'cable landing points')
   assert.deepEqual(cables.lat, [37.95, -3.73, 40.71, 25.77])
   assert.deepEqual(cables.lon, [-8.87, -38.52, -74.0, -80.19])
+  // below its diamond unless the tokens say otherwise: New York's goes east, away from US-East
+  assert.deepEqual(cables.textposition,
+    ['bottom center', 'bottom center', 'bottom right', 'bottom center'])
   const star = data.find(t => t.name === 'origin')
   assert.deepEqual(star.lat, [53.8])
   assert.equal(star.marker.symbol, 'star')
@@ -512,4 +518,43 @@ test('datedRoutes names two runs sharing a label apart, by the name the page gav
   ]
   assert.deepEqual(datedRoutes(runs, 'sao-paulo').map(entry => entry.label),
     ['leeds_bt 13:59', 'leeds_bt 15:32'])
+})
+
+test('runs sharing a map share one label at the end: the target, on its own side', () => {
+  // Every run on this map goes to the same relay, so a name at each end stacked them all on
+  // one point. The legend names the runs; the end says where they all went, once.
+  const runs = [run('a', LONDON_THEN_NOTHING), run('b', LONDON_THEN_NOTHING)]
+  const { data } = mapFigure(runs, 'sao-paulo', TOKENS)
+  const ends = data.filter(t => t.mode === 'markers+text' && ['a', 'b'].includes(t.name))
+  for (const trace of ends) assert.ok(trace.text.every(text => text === ''))
+  const label = data.find(t => t.name === 'end')
+  assert.deepEqual(label.text, ['sao-paulo'])
+  assert.equal(label.textposition, 'middle right')
+  assert.equal(label.meta.role, 'muted')
+  // US-East sits south-west of New York, so its name is written to the west
+  const toEast = (id) => run(id, null, { traces: { 'us-east': LONDON_THEN_NOTHING } })
+  const east = mapFigure([toEast('a'), toEast('b')], 'us-east', TOKENS).data
+    .find(t => t.name === 'end')
+  assert.deepEqual(east.text, ['us-east'])
+  assert.equal(east.textposition, 'top left')
+  // one run alone keeps its own name at its end, on the same side
+  const alone = mapFigure([toEast('leeds')], 'us-east', TOKENS).data
+  assert.equal(alone.find(t => t.name === 'leeds' && t.mode === 'markers+text').textposition,
+    'top left')
+  assert.equal(alone.find(t => t.name === 'end'), undefined)
+})
+
+test('"you" is written once for starting points close enough to run together', () => {
+  // Leeds and London, three degrees apart, printed "you" over "you" on a phone; Leeds and
+  // Santander, ten apart, are two places and keep a word each.
+  const leeds = run('leeds', LONDON_THEN_NOTHING)
+  const london = run('london', LONDON_THEN_NOTHING)
+  london.analysis = { origin: [51.51, -0.13], targets: {} }
+  const santander = run('santander', LONDON_THEN_NOTHING)
+  santander.analysis = { origin: [43.46, -3.8], targets: {} }
+  const near = mapFigure([leeds, london], 'sao-paulo', TOKENS).data.find(t => t.name === 'origin')
+  assert.deepEqual(near.lat, [53.8, 51.51]) // still a star at each
+  assert.deepEqual(near.text, ['you', ''])
+  const far = mapFigure([leeds, santander], 'sao-paulo', TOKENS).data.find(t => t.name === 'origin')
+  assert.deepEqual(far.text, ['you', 'you'])
 })

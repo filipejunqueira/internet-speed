@@ -131,8 +131,8 @@ Approved 2026-09-24 as recommended: decisions 1 to 3 as written, and decision 4 
 - Parallel: no — every later check uses it
 
 **Step 11. `labelSide`, in Python and in the tokens block — DONE**
-- Done: `render_map.LABEL_SIDE`, all four relays named, us-east `middle left`; emitted as
-  `labelSide`. The tokens test lives in `tests/test_publish.py`, not the file named below;
+- Done: `render_map.LABEL_SIDE`, all four relays named, us-east `middle left` (changed in
+  step 6 to `top left`, with New York added); emitted as `labelSide`. The tokens test lives in `tests/test_publish.py`, not the file named below;
   it now checks the key and that it is the Python table. 13 passed, ruff clean.
 - Needs: `render_map.py` (the constant); `render_web.py` `explorer_tokens`;
   `tests/test_render_web.py`
@@ -202,7 +202,15 @@ Approved 2026-09-24 as recommended: decisions 1 to 3 as written, and decision 4 
   two or more runs; `overlaps.mjs` shows 0 pairs in "Where the round trips … fell"
 - Parallel: yes, beside steps 8 and 9 — JavaScript only; after step 4, same file
 
-**Step 6. Map labels: a shared end point once, "you" once, us-east to the west**
+**Step 6. Map labels: a shared end point once, "you" once, us-east to the west — DONE**
+- Done: two or more drawn runs get one muted `end` label (the target, its own trace, so
+  hiding a run keeps it); a run drawn alone keeps its name at its end. "you" once for
+  starting points within 8° (`YOU_APART_DEG`, JavaScript only: a report map has one
+  origin). Side table changed twice on measurement: `middle left` for us-east still met
+  "New York" on a phone, where the two points sit about 4 px apart, so us-east went `top
+  left`, and the table grew to hold New York at `bottom right`. The table now covers any
+  named point, not only relays. Local explorer states: 0 pairs, 0 repeated names, both
+  widths. Node 174, publish tests 13.
 - Needs: decision 3; step 11's `labelSide` in the tokens; `map.js` `mapFigure`, whose
   comment "so identity never rests on colour alone" is rewritten to say the legend now
   does that; `tests/js/map.test.js`

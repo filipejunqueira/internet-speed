@@ -16,11 +16,13 @@ from .trace import trace
 
 REFERENCE_POINTS = {"Sines (EllaLink)": SINES, "Fortaleza (EllaLink)": FORTALEZA,
                     "New York": NEW_YORK, "Miami": MIAMI}
-# Which side of its end point each relay's name is written, on the report map and the
-# explorer's (emitted in the tokens block). US-East sits four degrees south-west of New
-# York, so its name goes west, away from New York's.
-LABEL_SIDE = {"london": "middle right", "madrid": "middle right", "us-east": "middle left",
-              "sao-paulo": "middle right"}
+# Which side of its point each named place is written, on the report map and the
+# explorer's (emitted in the tokens block): the relays, and any cable landing not written
+# below its diamond. US-East sits four degrees south-west of New York, which a phone draws
+# about four pixels apart, so the two names go to opposite sides: US-East above and west,
+# New York below and east, over the Atlantic.
+LABEL_SIDE = {"london": "middle right", "madrid": "middle right", "us-east": "top left",
+              "sao-paulo": "middle right", "New York": "bottom right"}
 # dataviz categorical slots 1-4 (validated for adjacent-pair colour-blind separation)
 COLOURS = {"london": "#2a78d6", "madrid": "#eb6834", "us-east": "#1baf7a",
            "sao-paulo": "#eda100", "router": "#898781", "isp-hop": "#898781"}
