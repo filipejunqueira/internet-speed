@@ -66,10 +66,12 @@ Found by the site walk on 2026-09-24; evidence in `notes/site-walk-2026-09-24/`.
       returns once the bytes already queued have left and Cloudflare has answered, and the
       sampler runs until all three have returned (`speed.py:51-60`, `89-91`). Download
       stops counting and receiving at the same moment, so it has no tail. The zeros are
-      bytes still leaving, uncounted, not a dead line. Two effects now pull the stored
-      upload figure opposite ways: counting at queue entry inflates it (the Later item on
-      over-counting), and dividing by a time that includes the drain deflates it. Which
-      wins wants a measurement before the chart or the figure changes. The download axis
+      bytes still leaving, counted earlier, not a dead line. One cause, two symptoms, and
+      the stored figure is not one of them: on that run it reads 42.7 Mbit/s against 43.7
+      for the mean of all its samples, and the samples add up to 31.4 MB of its 31.5 MB.
+      It is the whole transfer's average. What is wrong is the timeline's shape, rate
+      credited as bytes are queued and zeros while the queue drains, so the fix is in the
+      drawing or in sampling at send time, not in any stored number. The download axis
       starting near 15 is plotly fitting its range to data with no zeros in it
 - [ ] A ticked run's box fills solid ink with no check mark and reads as blacked out.
       Minor, a matter of taste
@@ -106,8 +108,11 @@ Found by the site walk on 2026-09-24; evidence in `notes/site-walk-2026-09-24/`.
       recomputed with the fixed loss accounting and appended as a new record
 - [ ] Upload speed over-counts: `speed._upload` counts a block when it enters httpx's
       buffer, not when it leaves the machine. Three streams × 64 KB at the deadline is
-      ~8 % on a 2 Mbit/s uplink over 10 s, noise on a fast line. Pulls against the drain
-      time in the throughput item under Next; settle the two together
+      ~8 % on a 2 Mbit/s uplink over 10 s, noise on a fast line. Checked 2026-09-24, and
+      it does not hold for the stored figure: this assumed the clock stops at the deadline,
+      but `seconds` runs until the uploads have finished sending, so queued bytes are
+      counted and timed alike (see the throughput item under Next). What it inflates is
+      each early sample on the chart. Close this unless a slow uplink shows otherwise
 - [ ] Decide: `.gitignore` ignores `notes/snapshots/` but the snapshot skill treats
       snapshots as tracked history. Pick a side. Both GitHub repos are public
       (checked 2026-09-03 via the API). Recommendation: leave it ignored. CLAUDE.md
