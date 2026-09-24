@@ -67,8 +67,9 @@ export function fmt(value, nd = 1, unit = '') {
   return text + unit
 }
 
+/** A run's name: the one the page gave it to tell it apart, else its label, else its id. */
 export function runName(row) {
-  return row.label || row.id
+  return row.displayName || row.label || row.id
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -114,7 +115,7 @@ export function distinctNames(rows) {
 
 /** The name where the space is tight: a label if there is one, else a stub of the id. */
 export function shortName(row) {
-  return row.label || String(row.id).slice(0, 10)
+  return row.displayName || row.label || String(row.id).slice(0, 10)
 }
 
 /**

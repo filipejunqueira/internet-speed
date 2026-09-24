@@ -501,3 +501,15 @@ test('datedRoutes names each run whose route needs a word, and only those', () =
     { label: 'undated', note: 'When this route was traced was not recorded.' }
   ])
 })
+
+test('datedRoutes names two runs sharing a label apart, by the name the page gave each', () => {
+  // The explorer sets displayName on its own copy of each ticked run (dom.distinctNames);
+  // the caption has to use it, or two leeds_bt sentences cannot say which run is which.
+  const started = { timestamp: '2026-08-30T12:00:00+00:00', duration_s: 60, label: 'leeds_bt' }
+  const runs = [
+    run('a', LONDON_THEN_NOTHING, { ...started, displayName: 'leeds_bt 13:59' }),
+    run('b', LONDON_THEN_NOTHING, { ...started, displayName: 'leeds_bt 15:32' })
+  ]
+  assert.deepEqual(datedRoutes(runs, 'sao-paulo').map(entry => entry.label),
+    ['leeds_bt 13:59', 'leeds_bt 15:32'])
+})

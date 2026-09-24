@@ -155,7 +155,15 @@ Approved 2026-09-24 as recommended: decisions 1 to 3 as written, and decision 4 
 - Parallel: yes, beside steps 8 and 9 — `dom.js` and its test are touched by no Python
   step. Runs as a branch only on your yes (decision 4)
 
-**Step 3. Wire the names into every surface**
+**Step 3. Wire the names into every surface — DONE**
+- Done: `rebuildBody` names the ticked runs from their index rows before any record arrives
+  and sets `displayName` on the page's copy; `nameOf` reads the same names. Discovery:
+  `figures.js` and `map.js` each keep a private copy of `runName` (the modules import only
+  `stats.js`), so both copies got the same rule rather than a new import. Local build: 0
+  repeated names (80 before). `failed-load.mjs` with 15:15's JSON blocked: "The numbers
+  behind leeds_bt 15:15 would not load", beside tiles "leeds_bt 13:59" and "leeds_bt 15:32".
+  Overlaps rose 56 to 63 on the explorer states, longer names colliding more; steps 4 to 7.
+  Node: 171 passed.
 - Needs: step 2; `app.js` (where the ticked runs are loaded, and `nameOf`); `dom.runName`
   and `dom.shortName`; `map.js` `datedRoutes`
 - Thinking: medium — main session

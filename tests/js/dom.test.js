@@ -117,6 +117,10 @@ test('runName and shortName fall back to the id when the run has no label', () =
   assert.equal(runName(unlabelled), 'leeds_bt_2026-08-30T15-32-20Z')
   // where space is tight, ten characters of the id stand in for the whole thing
   assert.equal(shortName(unlabelled), 'leeds_bt_2')
+  // a name the page gave the run to tell it from another comes first, in both
+  const named = summaryRow({displayName: 'leeds 15:32'})
+  assert.equal(runName(named), 'leeds 15:32')
+  assert.equal(shortName(named), 'leeds 15:32')
 })
 
 test('every picker row carries its id, and only the ticked ones carry class on', () => {

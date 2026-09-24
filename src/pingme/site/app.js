@@ -61,6 +61,8 @@ const MAP_NOTE = 'map-note'
 // Everything the page knows, kept in module variables because there is exactly one page.
 let tokens = null
 let indexRows = []
+// The names the ticked runs are shown by, set per render by dom.distinctNames.
+let shownNames = new Map()
 let state = null
 // Every render takes a number. A fetch that finishes after a later tick has already
 // started rendering must not overwrite it, so it checks its number before writing.
@@ -254,6 +256,9 @@ async function rebuildBody() {
     return
   }
 
+  // Named from the index rows, before any record arrives, so a run whose numbers fail to
+  // load is named in the same way as the ones beside it.
+  shownNames = dom.distinctNames(ids.map((id) => indexRows.find((row) => row.id === id) || {id}))
   // Only a run that has never been fetched is worth dimming the page for; a target change
   // or a re-tick is served from the cache and should not so much as flicker.
   setLoading(ids.some((id) => !cache.has(id)))
@@ -267,7 +272,8 @@ async function rebuildBody() {
   // The rest of the comparison is still worth drawing.
   const failed = fetched.filter((item) => item.error).map((item) => item.id)
   const runs = fetched.filter((item) => item.record)
-    .map((item) => ({...item.record, slot: slotOf(state, item.id)}))
+    .map((item) => ({...item.record, slot: slotOf(state, item.id),
+      displayName: shownNames.get(item.id)}))
   const context = await renderComparison(body, runs, failed)
   // Drawing the figures is another wait, so the check is worth repeating: only a render
   // that got this far without being overtaken may say what is on screen.
@@ -537,6 +543,7 @@ function failedNote(failed) {
 
 /** A run's name from the index row, so a run that failed to load can still be named. */
 function nameOf(id) {
+  if (shownNames.has(id)) return shownNames.get(id)
   const row = indexRows.find((item) => item.id === id)
   return row ? dom.runName(row) : id
 }

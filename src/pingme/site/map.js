@@ -77,8 +77,9 @@ export function routePoints(traceEntry, origin) {
   return walk(traceEntry, origin).points
 }
 
+// The same rule as dom.runName: the name the page gave the run to tell it apart comes first.
 function runName(run) {
-  return run.label || run.id
+  return run.displayName || run.label || run.id
 }
 
 /** The colour slot a run keeps, falling back to its place among the runs actually drawn.

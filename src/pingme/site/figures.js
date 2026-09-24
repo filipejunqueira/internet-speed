@@ -371,8 +371,9 @@ function slotFor(run, index) {
   return slot === null || slot === undefined ? index : slot
 }
 
+// The same rule as dom.runName: the name the page gave the run to tell it apart comes first.
 function runName(run) {
-  return run.label || run.id
+  return run.displayName || run.label || run.id
 }
 
 /** A token hex as an rgba string, for the fills the theme swap does not reach. */
