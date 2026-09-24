@@ -134,20 +134,24 @@ Conditions the change must never break, each with the check that holds it:
 
 Named together in one message when they are all true, per CLAUDE.md:
 
-- [ ] `uv run ruff check .` clean.
-- [ ] `uv run pytest` green, count shown, node tests included.
-- [ ] `trace_note` tested against the cases file before it is wired in; the file covers
-      all three cases, the window boundary on both sides, and each unit of gap.
-- [ ] `traceNote` tested against the same file; a case added to the file fails both tests
-      until both sides handle it.
-- [ ] Invariant 1 held by a byte-identity test; invariant 2 by a test on each side.
-- [ ] A real run on this machine, output shown: `uv run pingme --quick --web` whose map
+- [x] `uv run ruff check .` clean. "All checks passed!", 2026-09-24.
+- [x] `uv run pytest` green, count shown, node tests included. 130 passed; `node --test
+      "tests/js/*.test.js"` on its own, 164 passed. 2026-09-24.
+- [x] `trace_note` tested against the cases file before it is wired in; the file covers
+      all three cases, the window boundary on both sides, and each unit of gap. Step 1.
+- [x] `traceNote` tested against the same file; a case added to the file fails both tests
+      until both sides handle it. Step 2.
+- [x] Invariant 1 held by a byte-identity test; invariant 2 by a test on each side. Step 4.
+- [x] A real run on this machine, output shown: `uv run pingme --quick --web` whose map
       carries no sentence, and the republished 13:59 run whose page says the date and gap.
-- [ ] The live page for the 13:59 run, read in the headless browser, shows the sentence,
+      See step 5.
+- [x] The live page for the 13:59 run, read in the headless browser, shows the sentence,
       and the explorer with that run ticked shows it under the map with the run's name.
-- [ ] `notes/record-schema.md` describes `traced_at`; `SCHEMA` is 2; the fixture run in
+      See step 5, which also names what this criterion did not foresee.
+- [x] `notes/record-schema.md` describes `traced_at`; `SCHEMA` is 2; the fixture run in
       `tests/fixtures/run.json` is left as it is (it has no traces and stays a schema-1
-      record on purpose, so old-record paths keep a test).
+      record on purpose, so old-record paths keep a test). Read back 2026-09-24:
+      `run.py:33`, `record-schema.md:267`, the fixture last touched in 1491335.
 
 ## Steps
 
@@ -178,8 +182,28 @@ Named together in one message when they are all true, per CLAUDE.md:
         the rule); fixed with a test in 78e7a8f. That rule is unconditional, so reports are no
         longer byte-identical to c2fd266; invariant 1 now means identical to the same code with
         the note switched off, which the committed test holds.
-- [ ] 5. Gate; a real `--quick --web` run; republish the 13:59 run; read the live page;
-        archive this plan and write TODO.md.
+- [x] 5. Gate; a real `--quick --web` run; republish the 13:59 run; read the live page;
+        archive this plan and write TODO.md. Done 2026-09-24 from the container.
+        The real run, `route-date-check_2026-09-24T18-13-37Z` (Virgin Media, Leeds): its
+        report holds neither sentence and no `.note` at all, and so does its map-only page
+        from `pingme map`. The record is schema 2; all four routes carry one `traced_at`,
+        39.9 s after the run started, inside its 930 s window.
+        The republish, `uv run pingme publish leeds_bt_2026-08-30T13-59-15Z`, site commit
+        20c7796: the page reads "Traced on 2026-09-24, 25 days after this run, so it may
+        not be the path the run took.", worked out by hand before it was read (run end
+        13:59:45Z, traced 18:14:58Z, so 25 days by flooring). SSID and IP still read
+        `redacted`, and the private run just made is nowhere under `runs/`. The commit
+        also carried `app.js` and `map.js`: the route-date code reached the site only now.
+        Read live in headless Chromium, at 1280 px light and dark and 390 px: the report
+        page shows the sentence under the map, 12 px in the muted colour, so the 78e7a8f
+        style is live; one tick shows it inside the frame; 13:59 and 15:32 ticked show one
+        sentence per run under the map, each after its run's name. That last one is where
+        this criterion fell short: every Leeds run is called `leeds_bt`, so the caption
+        reads "leeds_bt: Traced on … leeds_bt: When this route was traced was not recorded."
+        and nothing says which is which. It is the duplicate-name item in TODO.md, which
+        now covers this caption too.
+        Found on the way: the record predates versioning, so the published JSON has no
+        `schema` key although its routes now carry `traced_at`. Put in TODO.md Later.
 
 About two hours of session work. Steps 1 and 2 can run in parallel with step 3: they touch
 different files (`render_map.py` is shared by 1 and 3, so 3 waits for 1). Step 4 waits

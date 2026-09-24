@@ -1,28 +1,11 @@
 # TODO — internet-speed
 
-Last updated: 2026-09-23
+Last updated: 2026-09-24
 
 ## Now
 
-The first two items are PLAN.md, the route date. Steps 1 to 4 are done and tested;
-step 5 (a real `--quick --web` run, republishing the 13:59 run, reading the live page)
-is left for a later session.
-
-- [ ] Decide what to do about the map on `leeds_bt_2026-08-30T13-59-15Z`. Publishing it
-      on 2026-09-10 re-traced the route, because the record carries no trace, and the
-      trace ran on the container's network today rather than the Leeds BT line the run
-      measured on 2026-08-30. The page says nothing about this. Its first hops are now
-      192.168.1.1 → 192.168.0.1 → 10.53.38.165, where its sibling run from the same
-      afternoon shows 192.168.1.254 → 172.16.13.221 → 109.159.255.101, the real BT path.
-      Two ways out: republish it with `--no-map`, so a run whose route was never recorded
-      gets no map instead of somebody else's, or keep the map and put the trace date on
-      the page beside it. The second is the better fix for every run, because a route
-      traced later is worth something as long as the page says when it was traced
-
-- [ ] Store the trace date in the record, and show it on any page that draws a map. A
-      trace made at publish time carries no timestamp at all, so nothing downstream can
-      tell a route measured during the run from one measured weeks later somewhere else.
-      Found by publishing the 13:59 run on 2026-09-10
+No plan is open. The site was walked on 2026-09-24; what it found is in
+`notes/site-walk-2026-09-24/README.md`, with the new problems under Next.
 
 - [ ] Decide what to do about an old row in `runs/index.json` keeping numbers the code
       no longer agrees with. The table shows 100.0 % worst loss for the three Leeds runs
@@ -45,12 +28,17 @@ is left for a later session.
       under the first legend entry on the busy-delay chart; the histogram stacks all
       three run names in its top-left corner over the plot and repeats the legend; the
       map prints all three run names on one point at São Paulo and "You" twice over the
-      UK
+      UK. Two more of the same kind, found 2026-09-24: on every report page's histogram
+      the "median" and "p95" labels print on top of the legend, and on the report map the
+      US-East label prints over New York's
 
 - [ ] Tell two runs apart when they share a label. Three runs are all called
       `leeds_bt`, so the legends, the tile headings, the comparison header and the
       "numbers would not load" sentence all read the same name twice. Colour separates
-      them, the words do not. Candidate: label plus the run's date and time
+      them, the words do not. Candidate: label plus the run's date and time. Since
+      2026-09-24 the map caption's route-date sentences read "leeds_bt: Traced on …
+      leeds_bt: When this route was traced was not recorded.", so they cannot say which
+      run they are about either
 
 ## Next
 
@@ -58,6 +46,18 @@ is left for a later session.
       against `leeds_bt_2026-08-30T15-32-20Z`
 - [ ] Confirm which relay Dota actually uses in a match: `ss -unp | grep -i dota` during a game
 - [ ] Probe over UDP to the relay's game ports, so loss matches what the game sees
+
+Found by the site walk on 2026-09-24; evidence in `notes/site-walk-2026-09-24/`.
+
+- [ ] Dark mode: the explorer's chart legends and axis titles stay `#52514e`, 2.2:1 on the
+      dark card, nearly invisible. The report pages' axis titles look as dim (not measured)
+- [ ] Light mode: every caption is `#898781` at 12 px, 3.5:1 on the card, under the 4.5:1
+      WCAG AA asks of small text. The route-date sentence is one of them
+- [ ] Phone: the explorer's map keeps its desktop height, so two thirds of its card is blank
+- [ ] Throughput: the 13:59 report's upload line sits at zero for its last two seconds, and
+      the 2026-09-03 one ends on a zero; both read as the line failing. Find out why first
+- [ ] A ticked run's box fills solid ink with no check mark and reads as blacked out.
+      Minor, a matter of taste
 
 ## Later
 
@@ -75,7 +75,17 @@ is left for a later session.
       third changes any code here (`parse_sdr`). blocked-by: the vpn project's answer
 
 - [ ] Physics route floors are too coarse near 190 ms (Madrid-side cable vs via USA); add candidate cables landing in Spain/Portugal, or drop the estimate when hops are visible
-- [ ] Doubtful hop geolocation (RIPE IPmap put a Telefónica router in Saint Petersburg); show a confidence or prefer hostname codes
+- [ ] Doubtful hop geolocation (RIPE IPmap put a Telefónica router in Saint Petersburg); show a confidence or prefer hostname codes.
+      Now on a published page: the 13:59 run's route, re-traced 2026-09-24, goes London →
+      Serra Talhada (Brazil) → Canary Wharf for the London relay
+- [ ] Write the route traced at publish time back into the private log, so a run with no
+      trace stops being re-traced, somewhere new, on every publish. It changes the log
+      record of a run already measured, so it is a decision first. Left out of the
+      route-date plan on purpose
+- [ ] Give a published record from before versioning a `schema` it can be read by. The
+      13:59 run's JSON on the site has no `schema` key, yet its routes carry `traced_at`
+      since the 2026-09-24 republish, because `publish` splices fresh traces into an old
+      record. A reader trusting the tag would not look for the field. Found 2026-09-24
 
 - [ ] `pingme reanalyse [id]`: every record stores its samples, so old runs can be
       recomputed with the fixed loss accounting and appended as a new record
@@ -101,6 +111,15 @@ is left for a later session.
 - [ ] Scheduled background runs
 
 ## Done
+- 2026-09-24 — The route date is live, and its plan is archived
+  (`notes/plans/2026-09-24_route-date.plan.md`). A real `--quick --web` run in the
+  container drew its map with no sentence; republishing `leeds_bt_2026-08-30T13-59-15Z`
+  put "Traced on 2026-09-24, 25 days after this run, so it may not be the path the run
+  took." under its map, read back on the live report page and in the explorer. That
+  settles the two route-date items that led Now, and closes the explorer plan's step 5,
+  whose one open question was this map. The same walk looked at the whole site in light,
+  dark and phone views: `notes/site-walk-2026-09-24/`, new problems under Next.
+
 - 2026-09-23 — The two config fixes agreed last session. CLAUDE.md's corrections log now
   names the three run logs and which runs each holds. The global `rules/python.md` no longer
   says to edit Python through the shell; it names the Bash hook and the

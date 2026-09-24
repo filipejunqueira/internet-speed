@@ -1,7 +1,9 @@
 # pingme: one page to read any run and compare up to three
 
 Date: 2026-09-03. Branch `master`, working tree clean after c6c9bd8.
-Status: **done, with one thing left to decide.** Steps 0 to 6 are done. Step 5 was
+Status: **done.** The one thing that was left to decide, the re-traced map on
+`leeds_bt_2026-08-30T13-59-15Z`, was settled by `2026-09-24_route-date.plan.md`: the map
+stays, and says when it was traced (republished 2026-09-24). Steps 0 to 6 are done. Step 5 was
 walked on the live site on 2026-09-10 with a headless browser, and the run that had
 no numbers was published from the container the same day. What the walk found, and
 what the publish turned up, are under that step. `uv run ruff check .` clean and
