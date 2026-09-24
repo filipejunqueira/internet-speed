@@ -20,6 +20,8 @@ const pages = [
   ['report 2026-09-03', `runs/${R0903}.html`],
 ]
 const widths = [['desk', 1280], ['phone', 390]]
+// ONLY=report,Leeds keeps the states whose name contains any of those words, for a quick look
+const only = (process.env.ONLY || '').split(',').filter(Boolean)
 // A text box is taller than its letters, so two boxes can graze by a pixel or two with no
 // ink touching: measured 1.3-2.0 px for a legend under a title. Real collisions measured
 // 11-14 px. Count only an overlap at least this wide and this tall.
@@ -33,6 +35,7 @@ let failed = 0
 for (const [tag, width] of widths) {
   const ctx = await browser.newContext({ viewport: { width, height: 900 }, isMobile: tag === 'phone' })
   for (const [name, url] of pages) {
+    if (only.length && !only.some((w) => name.includes(w))) continue
     const page = await ctx.newPage()
     await page.goto(BASE + url + (url.includes('?') ? '&' : '?') + `t=${Date.now()}`,
       { waitUntil: 'networkidle', timeout: 90000 })

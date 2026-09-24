@@ -19,7 +19,15 @@ from plotly import __version__ as PLOTLY_VERSION
 from plotly.offline import get_plotlyjs
 
 from .probe import INTERVAL_S
-from .render_map import TRACE_QUERIES, hop_rows, map_figure, trace_notes, traced_path, traces_for
+from .render_map import (
+    LABEL_SIDE,
+    TRACE_QUERIES,
+    hop_rows,
+    map_figure,
+    trace_notes,
+    traced_path,
+    traces_for,
+)
 from .stats import COINCIDENCE_WINDOW_S, SPIKE_OVER_MS
 from .store import burst_probes, data_dir, is_silent
 
@@ -521,6 +529,7 @@ def explorer_tokens(site: Path | None = None) -> dict:
         # the folder reads as a folder.
         "topojsonUrl": "assets/" if site is not None and (site / TOPOJSON_ASSET).exists()
                        else None,
+        "labelSide": dict(LABEL_SIDE),
     }
 
 

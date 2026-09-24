@@ -65,6 +65,8 @@ returns `label || id.slice(0, 10)` and so would miss a fix made only in `runName
 
 ## Decisions for you
 
+Approved 2026-09-24 as recommended: decisions 1 to 3 as written, and decision 4 serial.
+
 1. **Name format when labels clash.** Recommendation: only when two or more ticked runs share
    a label, add the shortest part of their UTC start that tells them apart. That's the time
    when they share a date (`leeds_bt 13:59`, `leeds_bt 15:15`), the date when they don't
@@ -115,7 +117,10 @@ returns `label || id.slice(0, 10)` and so would miss a fix made only in `runName
 
 ### Part A — measuring
 
-**Step 1. A local copy of the site to test against**
+**Step 1. A local copy of the site to test against — DONE**
+- Done: `build_local.py` rebuilt all four report pages and the index into the scratchpad;
+  `overlaps.mjs` on it gave 127 pairs and 80 repeated names, the live baseline exactly.
+  `ONLY=<words>` now limits a run to the states named, for the quick looks between steps.
 - Needs: the container's site clone; `overlaps.mjs`; the build used for the contrast check
   earlier today, turned into `notes/site-walk-2026-09-24/build_local.py`, which copies the
   clone without its `.git`
@@ -125,7 +130,10 @@ returns `label || id.slice(0, 10)` and so would miss a fix made only in `runName
   totals; that is the local baseline, recorded here
 - Parallel: no — every later check uses it
 
-**Step 11. `labelSide`, in Python and in the tokens block**
+**Step 11. `labelSide`, in Python and in the tokens block — DONE**
+- Done: `render_map.LABEL_SIDE`, all four relays named, us-east `middle left`; emitted as
+  `labelSide`. The tokens test lives in `tests/test_publish.py`, not the file named below;
+  it now checks the key and that it is the Python table. 13 passed, ruff clean.
 - Needs: `render_map.py` (the constant); `render_web.py` `explorer_tokens`;
   `tests/test_render_web.py`
 - Thinking: light — main session

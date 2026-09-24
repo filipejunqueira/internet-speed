@@ -7,6 +7,7 @@ import httpx
 import pytest
 
 from pingme import publish as pub
+from pingme.render_map import LABEL_SIDE
 from pingme.render_web import PLOTLY_ASSET, TOPOJSON_ASSET, build_report, redact
 from pingme.store import summary_row
 
@@ -184,7 +185,10 @@ def test_the_tokens_block_carries_three_run_slots_and_every_key(site):
     pub.publish(_run(), with_map=False)
     tokens = _tokens((site["dir"] / "index.html").read_text())
     assert set(tokens) == {"runSlots", "chrome", "status", "targetOrder", "thresholds",
-                           "intervalS", "maxRuns", "font", "topojsonUrl"}
+                           "intervalS", "maxRuns", "font", "topojsonUrl", "labelSide"}
+    # the side of its end point each relay's map label goes, one table for both maps
+    assert tokens["labelSide"] == LABEL_SIDE
+    assert set(LABEL_SIDE) == {"london", "madrid", "us-east", "sao-paulo"}
     # three is the cap because a fourth hue fails the colour-blindness check on the map
     assert len(tokens["runSlots"]["light"]) == len(tokens["runSlots"]["dark"]) == 3
     assert tokens["maxRuns"] == 3
