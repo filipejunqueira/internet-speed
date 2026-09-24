@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from pingme.render_web import build_report
+from pingme.render_web import CHROME, build_report
 
 FIXTURE = Path(__file__).parent / "fixtures" / "run.json"
 
@@ -230,11 +230,12 @@ def test_every_target_but_the_router_gets_the_band():
     run = _with_stalls()
     targets = run["analysis"]["targets"]
     html = build_report(run)
-    assert html.count('"fillcolor":"#898781"') == 2 * (len(targets) - 1)  # two stalls each
+    band = f'"fillcolor":"{CHROME["light"]["muted"]}"'
+    assert html.count(band) == 2 * (len(targets) - 1)  # two stalls each
     # and the one section without a band is the router's, not somebody else's
     router = html.split('id="target-router"')[1].split("</section>")[0]
-    assert '"fillcolor":"#898781"' not in router
-    assert build_report(json.loads(FIXTURE.read_text())).count('"fillcolor":"#898781"') == 0
+    assert band not in router
+    assert build_report(json.loads(FIXTURE.read_text())).count(band) == 0
 
 
 def test_the_run_note_is_shown_and_escaped():

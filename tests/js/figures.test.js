@@ -11,7 +11,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
-  histogramFigure, overviewFigure, penaltyFigure, themeRoles, timelineFigure
+  histogramFigure, overviewFigure, penaltyFigure, themeRoles, themeTextUpdate, timelineFigure
 } from '../../src/pingme/site/figures.js'
 
 // The block render_web.explorer_tokens() writes into the page, values and all.
@@ -19,7 +19,7 @@ const TOKENS = {
   runSlots: { light: ['#2a78d6', '#eb6834', '#1baf7a'], dark: ['#3987e5', '#d95926', '#199e70'] },
   chrome: {
     light: { surface: '#fcfcfb', page: '#f9f9f7', ink: '#0b0b0b', ink2: '#52514e',
-      muted: '#898781', grid: '#e1e0d9', axis: '#c3c2b7', border: 'rgba(11,11,11,0.10)' },
+      muted: '#6f6d68', grid: '#e1e0d9', axis: '#c3c2b7', border: 'rgba(11,11,11,0.10)' },
     dark: { surface: '#1a1a19', page: '#0d0d0d', ink: '#ffffff', ink2: '#c3c2b7',
       muted: '#898781', grid: '#2c2c2a', axis: '#383835', border: 'rgba(255,255,255,0.10)' }
   },
@@ -300,4 +300,35 @@ test('themeRoles hands back the dark steps when the page is dark', () => {
   // Loss is a status colour, not one of the three run hues, so it does not change with the
   // theme: the same red means the same thing on a light page and a dark one.
   assert.equal(light.lost, dark.lost)
+})
+
+test('themeTextUpdate repaints every piece of chrome text for the theme in force', () => {
+  // Figures are built in light chrome. Text given its own colour does not follow
+  // font.color, so a dark page left the legend and axis titles at #52514e on #1a1a19, 2.2:1.
+  const layout = {
+    annotations: [
+      { text: 'median 91', font: { size: 10, color: '#52514e' } },
+      { text: 'download', font: { size: 10, color: '#6f6d68' } },
+      { text: 'a run', font: { size: 11, color: '#2a78d6' } },
+      { text: 'no font' }
+    ]
+  }
+  const dark = themeTextUpdate(layout, TOKENS, true)
+  assert.equal(dark['legend.font.color'], '#c3c2b7')
+  assert.equal(dark['xaxis.title.font.color'], '#c3c2b7')
+  assert.equal(dark['yaxis.title.font.color'], '#c3c2b7')
+  assert.equal(dark['xaxis.tickfont.color'], '#898781')
+  assert.equal(dark['yaxis.tickfont.color'], '#898781')
+  assert.deepEqual(dark.annotations.map((a) => a.font && a.font.color),
+    ['#c3c2b7', '#898781', '#2a78d6', undefined])
+  // Only the colour changes: the size and the text ride along untouched.
+  assert.equal(dark.annotations[0].font.size, 10)
+  assert.equal(dark.annotations[0].text, 'median 91')
+  // A theme switched back finds the dark colours and returns them to the light ones.
+  const back = themeTextUpdate({ annotations: dark.annotations }, TOKENS, false)
+  assert.deepEqual(back.annotations.map((a) => a.font && a.font.color),
+    ['#52514e', '#6f6d68', '#2a78d6', undefined])
+  assert.equal(back['xaxis.tickfont.color'], '#6f6d68')
+  // A figure with no annotations is not handed an empty list to replace its own with.
+  assert.equal('annotations' in themeTextUpdate({}, TOKENS, true), false)
 })

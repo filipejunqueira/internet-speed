@@ -35,8 +35,10 @@ DARK = {"idle": "#3987e5", "download": "#d95926", "upload": "#199e70", "busy": "
         "london": "#3987e5", "madrid": "#d95926", "us-east": "#199e70", "sao-paulo": "#c98500",
         "router": "#898781", "isp-hop": "#898781"}
 STATUS = {"good": "#0ca30c", "warning": "#fab219", "serious": "#ec835a", "critical": "#d03b3b"}
+# Light muted is darker than the palette's #898781, an axis-label grey. Here it also sets
+# every caption, and 12 px text wants 4.5:1: #898781 gave 3.5 on the card, #6f6d68 gives 5.0.
 CHROME = {"light": {"surface": "#fcfcfb", "page": "#f9f9f7", "ink": "#0b0b0b", "ink2": "#52514e",
-                    "muted": "#898781", "grid": "#e1e0d9", "axis": "#c3c2b7",
+                    "muted": "#6f6d68", "grid": "#e1e0d9", "axis": "#c3c2b7",
                     "border": "rgba(11,11,11,0.10)"},
           "dark": {"surface": "#1a1a19", "page": "#0d0d0d", "ink": "#ffffff", "ink2": "#c3c2b7",
                    "muted": "#898781", "grid": "#2c2c2a", "axis": "#383835",
@@ -531,17 +533,27 @@ def _theme_js() -> str:
     return t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);}}
   function apply(){{
     const dark=isDark(), pal=dark?DARK:LIGHT, c=dark?C.dark:C.light;
+    // Text given a colour of its own does not follow font.color, so chrome text is found by
+    // its colour, either theme's secondary or muted ink, and moved to this theme's.
+    const ink={{}}; [C.light,C.dark].forEach(t=>{{ink[t.ink2]=c.ink2; ink[t.muted]=c.muted;}});
     document.querySelectorAll('.plotly-graph-div').forEach(div=>{{
       if(!div.data) return;
       div.data.forEach((tr,i)=>{{
-        const role=tr.meta&&tr.meta.role; if(!role||!pal[role]) return;
-        const upd={{}};
-        if(tr.marker){{upd['marker.color']=pal[role]; if(tr.marker.line) upd['marker.line.color']=pal[role];}}
-        if(tr.line) upd['line.color']=pal[role];
-        Plotly.restyle(div, upd, [i]);
+        const role=tr.meta&&tr.meta.role, upd={{}};
+        if(role&&pal[role]){{
+          if(tr.marker){{upd['marker.color']=pal[role]; if(tr.marker.line) upd['marker.line.color']=pal[role];}}
+          if(tr.line) upd['line.color']=pal[role];
+        }}
+        if(tr.textfont&&ink[tr.textfont.color]) upd['textfont.color']=ink[tr.textfont.color];
+        if(Object.keys(upd).length) Plotly.restyle(div, upd, [i]);
       }});
+      const notes=(div.layout.annotations||[]).map(a=>a.font&&ink[a.font.color]
+        ?{{...a,font:{{...a.font,color:ink[a.font.color]}}}}:a);
       Plotly.relayout(div, {{'font.color':c.ink,'xaxis.gridcolor':c.grid,'yaxis.gridcolor':c.grid,
         'xaxis.linecolor':c.axis,'yaxis.linecolor':c.axis,'title.font.color':c.ink2,
+        'xaxis.title.font.color':c.ink2,'yaxis.title.font.color':c.ink2,
+        'xaxis.tickfont.color':c.muted,'yaxis.tickfont.color':c.muted,
+        ...(notes.length?{{annotations:notes}}:{{}}),
         'geo.bgcolor':'rgba(0,0,0,0)','geo.landcolor':dark?'#2a2a28':'#f2efe9',
         'geo.oceancolor':dark?'#151a20':'#dbe9f6','geo.countrycolor':dark?'#444':'#bbb',
         'geo.coastlinecolor':dark?'#555':'#999'}});
