@@ -28,10 +28,15 @@ the other 143 of the 150 taken stayed in the session's scratchpad.
    (`histogram-dark.png`). Light mode uses the same colour on a light card, 7.7:1, so the
    charts keep their light-mode text colour in dark mode. On the report pages the legend
    does switch to white, but the axis titles look just as dim (seen, not measured).
+   **Fixed the same day (433bff8)**, with problem 2. `contrast.mjs` measured every text
+   element outside the map on both pages in both themes: the lowest went from 2.19:1 (the
+   report's "seconds" and the explorer's legends, dark) to 4.85:1.
 2. **Light mode, every caption.** The muted colour `#898781` at 12 px on the `#fcfcfb` card
    is 3.5:1, under the 4.5:1 floor the web accessibility guidelines (WCAG, level AA) set
    for small text. Every note under a chart is
    in it, the new route-date sentence included. Dark mode passes at 4.85:1.
+   **Fixed the same day (433bff8):** light muted is now `#6f6d68`, 5.03:1 on the card and
+   4.90:1 on the page.
 3. **Report pages, every histogram.** The "median" and "p95" labels at the top of the two
    dashed lines print on top of the legend (`report-histogram.png`). Same family as the
    three collisions already in TODO.md.
@@ -46,7 +51,8 @@ the other 143 of the 150 taken stayed in the session's scratchpad.
 7. **Throughput.** On the 13:59 report the upload line sits at zero for its last two
    seconds, and on the 2026-09-03 report the last upload point drops to zero; both read as
    the line failing (`throughput.png`). The download axis starts near 15 while the upload
-   axis starts at 0. Cause not checked.
+   axis starts at 0. Cause found the same day and written into the TODO.md item: the
+   upload counter stops at the deadline while the uploads are still draining.
 
 ## Already in TODO.md, seen again
 

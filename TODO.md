@@ -22,7 +22,10 @@ No plan is open. The site was walked on 2026-09-24; what it found is in
       the explorer says "When this route was traced was not recorded." for the same runs.
       `pingme publish 2026-09-03T13-14` (also in the user's log) needs the same. Publish
       from a clone level with master: the desktop, at 3ac048c, lacks only the `.note`
-      style (78e7a8f), so its pages would carry the sentence unstyled.
+      style (78e7a8f), so its pages would carry the sentence unstyled. The same three
+      republishes carry the contrast fix (433bff8) to those pages; until then the
+      2026-09-03 report measures 2.19:1 in dark mode and 3.41:1 in light, and the 15:15 and
+      15:32 pages, built by the same old code, should read the same (not measured).
       The same cause shows an em dash in the duration column for runs whose record does
       carry 60 s. Separate from this, the records themselves hold the old per-phase sent
       counts (São Paulo idle reads 34 % loss on the Leeds runs). The site never shows a
@@ -55,13 +58,19 @@ No plan is open. The site was walked on 2026-09-24; what it found is in
 
 Found by the site walk on 2026-09-24; evidence in `notes/site-walk-2026-09-24/`.
 
-- [ ] Dark mode: the explorer's chart legends and axis titles stay `#52514e`, 2.2:1 on the
-      dark card, nearly invisible. The report pages' axis titles look as dim (not measured)
-- [ ] Light mode: every caption is `#898781` at 12 px, 3.5:1 on the card, under the 4.5:1
-      floor the web accessibility guidelines set for small text. The route-date sentence is one of them
 - [ ] Phone: the explorer's map keeps its desktop height, so two thirds of its card is blank
 - [ ] Throughput: the 13:59 report's upload line sits at zero for its last two seconds, and
-      the 2026-09-03 one ends on a zero; both read as the line failing. Find out why first
+      the 2026-09-03 one ends on a zero; both read as the line failing. Cause, found
+      2026-09-24 and still in today's code (`route-date-check` ends `…12.54, 0.0, 0.0`):
+      `speed._upload` stops counting bytes at the deadline, but each `client.post` only
+      returns once the bytes already queued have left and Cloudflare has answered, and the
+      sampler runs until all three have returned (`speed.py:51-60`, `89-91`). Download
+      stops counting and receiving at the same moment, so it has no tail. The zeros are
+      bytes still leaving, uncounted, not a dead line. Two effects now pull the stored
+      upload figure opposite ways: counting at queue entry inflates it (the Later item on
+      over-counting), and dividing by a time that includes the drain deflates it. Which
+      wins wants a measurement before the chart or the figure changes. The download axis
+      starting near 15 is plotly fitting its range to data with no zeros in it
 - [ ] A ticked run's box fills solid ink with no check mark and reads as blacked out.
       Minor, a matter of taste
 
@@ -97,7 +106,8 @@ Found by the site walk on 2026-09-24; evidence in `notes/site-walk-2026-09-24/`.
       recomputed with the fixed loss accounting and appended as a new record
 - [ ] Upload speed over-counts: `speed._upload` counts a block when it enters httpx's
       buffer, not when it leaves the machine. Three streams × 64 KB at the deadline is
-      ~8 % on a 2 Mbit/s uplink over 10 s, noise on a fast line
+      ~8 % on a 2 Mbit/s uplink over 10 s, noise on a fast line. Pulls against the drain
+      time in the throughput item under Next; settle the two together
 - [ ] Decide: `.gitignore` ignores `notes/snapshots/` but the snapshot skill treats
       snapshots as tracked history. Pick a side. Both GitHub repos are public
       (checked 2026-09-03 via the API). Recommendation: leave it ignored. CLAUDE.md
@@ -117,6 +127,14 @@ Found by the site walk on 2026-09-24; evidence in `notes/site-walk-2026-09-24/`.
 - [ ] Scheduled background runs
 
 ## Done
+- 2026-09-24 — Chart text follows the theme, and captions pass 4.5:1 (433bff8, live in
+  site 8467e68). Dark mode left legends and axis titles at 2.19:1, because text given a
+  colour of its own ignored the theme repaint; light mode set every caption at 3.5:1. The
+  lowest text outside the map, measured on the live explorer and the 13:59 report in both
+  themes by `notes/site-walk-2026-09-24/contrast.mjs`, is now 4.85:1. The other three
+  report pages wait on the user's republish. The same session diagnosed the upload
+  chart's zero tail, written into its item under Next.
+
 - 2026-09-24 — The route date is live, and its plan is archived
   (`notes/plans/2026-09-24_route-date.plan.md`). A real `--quick --web` run in the
   container drew its map with no sentence; republishing `leeds_bt_2026-08-30T13-59-15Z`
