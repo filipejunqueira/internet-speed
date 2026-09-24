@@ -1,7 +1,9 @@
 import json
 from pathlib import Path
 
-from pingme.render_web import CHROME, build_report
+import pytest
+
+from pingme.render_web import CHROME, _hist, _timeline, build_report
 
 FIXTURE = Path(__file__).parent / "fixtures" / "run.json"
 
@@ -331,3 +333,26 @@ def test_the_map_page_carries_the_same_sentence(monkeypatch, tmp_path):
     page = Path(render_map.build_map(run)).read_text(encoding="utf-8")
     assert "Traced on" not in page
     assert _UNRECORDED not in page
+
+
+def test_line_and_band_labels_get_rows_of_their_own_under_the_legend():
+    """best, median and p95 a row each; download a row above upload; the legend above both.
+
+    On one row they ran into each other and into the legend: best 91 over median 95 on every
+    report histogram, and on a phone the upload name over the download one. A steady line
+    puts all three marks within a few pixels, so each takes its own row. The plot keeps the
+    height it had; the figure grows by the rows.
+    """
+    run = json.loads(FIXTURE.read_text())
+    entry = run["analysis"]["targets"]["us-east"]
+    hist = _hist(entry).layout
+    assert {a.text.split()[0]: a.yshift for a in hist.annotations} == \
+        {"best": 0, "median": 14, "p95": 28}
+    plot_px = hist.height - hist.margin.t - hist.margin.b
+    assert plot_px == 260 - 36 - 40
+    assert hist.legend.yanchor == "bottom"
+    assert (hist.legend.y - 1) * plot_px == pytest.approx(3 * 14 + 8)
+    line = _timeline(entry, run["phase_marks_s"]).layout
+    assert {a.text: a.yshift for a in line.annotations} == {"download": 14, "upload": 0}
+    line_px = line.height - line.margin.t - line.margin.b
+    assert (line.legend.y - 1) * line_px == pytest.approx(2 * 14 + 8)

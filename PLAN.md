@@ -239,7 +239,14 @@ Approved 2026-09-24 as recommended: decisions 1 to 3 as written, and decision 4 
 
 ### Part D — report pages
 
-**Step 8. Report histograms and timelines: label rows**
+**Step 8. Report histograms and timelines: label rows — DONE**
+- Done: `_layout(..., label_rows=n)` keeps the plot's height, grows the figure by the rows,
+  lifts the legend clear of them and pins the title to the top. Deviation: best, median
+  and p95 take a row each (0, 1, 2), not best and p95 sharing one, because a steady line
+  puts all three within a few pixels; the plan's condition, median on its own row, holds.
+  Timeline: download row 1, upload row 0. Local: report pages 17/11/21/22 pairs down to 1
+  each, the map, which is step 9. Seen: side by side, the histogram's plot starts a row
+  lower than the timeline's; left as it is. `tests/test_render_web.py`: 24 passed.
 - Needs: step 1; `render_web.py` `_layout`, `_hist`, `_phase_bands`; `tests/test_render_web.py`
 - Thinking: medium — main session
 - Check: `uv run pytest tests/test_render_web.py -q` with a test that "median" sits on a

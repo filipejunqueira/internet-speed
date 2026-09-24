@@ -65,17 +65,42 @@ def _fmt(v, nd: int = 1, unit: str = "") -> str:
     return "—" if v is None else f"{v:,.{nd}f}{unit}"
 
 
-def _layout(title: str | None = None, height: int = 260, legend: bool = True) -> dict:
+# One row of labels above the plot is a 10 px label and its box. The legend keeps a gap above
+# the top row, because its text box reaches a little below its foot, and the title keeps a
+# line of its own above the legend. The same rows figures.js gives the explorer.
+LABEL_ROW_PX = 14
+LEGEND_GAP_PX = 8
+LEGEND_ROW_PX = 22
+TITLE_ROW_PX = 24
+
+
+def _layout(title: str | None = None, height: int = 260, legend: bool = True,
+            label_rows: int = 0) -> dict:
+    """Shared chrome; `label_rows` rows above the plot for labels on its lines and bands.
+
+    With rows, the plot keeps the height it would have had and the figure grows to hold
+    them: the legend is lifted clear of the rows, in fractions of the plot's height because
+    that is all plotly offers a legend, and the title is pinned to the top of the figure.
+    """
     c = CHROME["light"]
     axis = {"gridcolor": c["grid"], "linecolor": c["axis"], "zeroline": False,
             "tickfont": {"color": c["muted"], "size": 11}, "title_font": {"color": c["ink2"]}}
+    top = 36 if title else 12
+    legend_box = {"orientation": "h", "y": 1.12, "x": 0, "font": {"size": 11}}
+    title_box = {"text": title or "", "font": {"size": 13, "color": c["ink2"]}, "x": 0}
+    if label_rows:
+        plot_px = height - top - 40
+        rows_px = label_rows * LABEL_ROW_PX
+        top = (rows_px + (LEGEND_GAP_PX + LEGEND_ROW_PX if legend else 0)
+               + (TITLE_ROW_PX if title else 4))
+        height = plot_px + top + 40
+        legend_box.update(yanchor="bottom", y=1 + (rows_px + LEGEND_GAP_PX) / plot_px)
+        title_box.update(yref="container", y=1, yanchor="top", pad={"t": 4})
     return {"template": "none", "paper_bgcolor": "rgba(0,0,0,0)",
             "plot_bgcolor": "rgba(0,0,0,0)", "font": {"family": FONT, "color": c["ink"]},
-            "margin": {"l": 48, "r": 12, "t": 36 if title else 12, "b": 40}, "height": height,
-            "title": {"text": title or "", "font": {"size": 13, "color": c["ink2"]}, "x": 0},
-            "xaxis": axis, "yaxis": dict(axis), "showlegend": legend,
-            "legend": {"orientation": "h", "y": 1.12, "x": 0, "font": {"size": 11}},
-            "hoverlabel": {"font": {"family": FONT}}}
+            "margin": {"l": 48, "r": 12, "t": top, "b": 40}, "height": height,
+            "title": title_box, "xaxis": axis, "yaxis": dict(axis), "showlegend": legend,
+            "legend": legend_box, "hoverlabel": {"font": {"family": FONT}}}
 
 
 def _div(fig: go.Figure, div_id: str, config: dict | None = None) -> str:
@@ -104,10 +129,13 @@ def _plot_config(plotly_src: str | None) -> dict:
 
 def _phase_bands(fig: go.Figure, marks: dict) -> None:
     dl, ul, back = marks.get("download"), marks.get("upload"), marks.get("idle-again")
-    for start, end, role in ((dl, ul, "download"), (ul, back, "upload")):
+    # download a row above upload: on a phone the upload band starts a few pixels after
+    # download's, and on one row the two names ran together
+    for start, end, role, row in ((dl, ul, "download", 1), (ul, back, "upload", 0)):
         if start is not None and end is not None:
             fig.add_vrect(x0=start, x1=end, fillcolor=LIGHT[role], opacity=0.08, line_width=0,
                           annotation_text=role, annotation_position="top left",
+                          annotation_yshift=row * LABEL_ROW_PX,
                           annotation_font={"size": 10, "color": CHROME["light"]["muted"]})
 
 
@@ -122,12 +150,16 @@ def _hist(entry: dict) -> go.Figure:
                                        hovertemplate="%{x} ms: %{y} probes<extra>" + name + "</extra>"))
     a = entry["all"]
     c = CHROME["light"]
-    for key, label in (("min_ms", "best"), ("median_ms", "median"), ("p95_ms", "p95")):
+    # a row each: on a steady line all three marks fall within a few pixels of each other
+    for row, (key, label) in enumerate((("min_ms", "best"), ("median_ms", "median"),
+                                        ("p95_ms", "p95"))):
         if a.get(key) is not None:
             fig.add_vline(x=a[key], line={"color": c["muted"], "width": 1, "dash": "dot"},
                           annotation_text=f"{label} {a[key]:.0f}", annotation_position="top",
+                          annotation_yshift=row * LABEL_ROW_PX,
                           annotation_font={"size": 10, "color": c["ink2"]})
-    fig.update_layout(_layout("round trip, ms (probes per bin)"), barmode="overlay", bargap=0.06)
+    fig.update_layout(_layout("round trip, ms (probes per bin)", label_rows=3), barmode="overlay",
+                      bargap=0.06)
     return fig
 
 
@@ -168,7 +200,7 @@ def _timeline(entry: dict, marks: dict, episodes: list[dict] | None = None) -> g
                                      hovertemplate="%{x:.1f} s: %{y} ms<extra>" + phase + "</extra>"))
     _phase_bands(fig, marks)
     _lost_marks(fig, entry)
-    fig.update_layout(_layout("round trip over the run, ms"))
+    fig.update_layout(_layout("round trip over the run, ms", label_rows=2))
     fig.update_xaxes(title_text="seconds")
     return fig
 
