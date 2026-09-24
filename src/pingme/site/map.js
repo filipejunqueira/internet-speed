@@ -13,6 +13,20 @@
 // a world map is concerned; drawing the second one would add a hop of zero length.
 const COLLAPSE_DEG = 0.05
 
+// The world's frame is 1.92 wide to 1 tall at every zoom (natural earth, measured at 390 and
+// 1280 px), so the height a map needs follows from its width. The box stops at 500 px, the
+// height it always had, where a desktop's width would ask for more.
+const GEO_ASPECT = 1.92
+const MAP_MARGIN_PX = 8
+const MAP_MAX_PX = 500
+
+/** The height of a map box `width` wide whose legend, under the map, is `legendPx` tall. */
+export function mapHeight (width, legendPx = 0) {
+  const inner = Math.max(0, width - 2 * MAP_MARGIN_PX)
+  return Math.min(MAP_MAX_PX,
+    Math.round(inner / GEO_ASPECT) + 2 * MAP_MARGIN_PX + Math.round(legendPx))
+}
+
 // Two starting points closer than this in both latitude and longitude share one "you": a
 // phone draws the world a few pixels to the degree, and the word is about twenty wide.
 const YOU_APART_DEG = 8
@@ -261,9 +275,12 @@ export function mapFigure(runs, target, tokens) {
     font: { family: tokens.font, color: chrome.ink, size: 12 },
     // A map has no axis labels to leave room for, so the margins are only the breathing
     // space the direct labels need at the edges.
-    margin: { l: 8, r: 8, t: 8, b: 8 },
+    margin: { l: MAP_MARGIN_PX, r: MAP_MARGIN_PX, t: MAP_MARGIN_PX, b: MAP_MARGIN_PX },
     showlegend: drawn.length > 1,
-    legend: { x: 0.01, y: 0.99, font: { color: chrome.ink2, size: 11 } },
+    // Under the map, not on it: on a phone the map fills its box, and a legend in the
+    // corner would sit over North America. Plotly widens the bottom margin to fit it.
+    legend: { orientation: 'h', x: 0, xanchor: 'left', y: 0, yanchor: 'top',
+      font: { color: chrome.ink2, size: 11 } },
     // The ground colours are the map's own, not part of the token palette: they are the
     // light-mode values the run pages use, and the page swaps them for the dark ones on a
     // theme change exactly as it does there.

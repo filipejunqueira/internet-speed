@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { datedRoutes, hopRows, mapFigure, routePoints, traceNote, untracedRuns } from '../../src/pingme/site/map.js'
+import { datedRoutes, hopRows, mapFigure, mapHeight, routePoints, traceNote, untracedRuns } from '../../src/pingme/site/map.js'
 
 const TOKENS = {
   runSlots: { light: ['#2a78d6', '#eb6834', '#1baf7a'], dark: ['#3987e5', '#d95926', '#199e70'] },
@@ -557,4 +557,23 @@ test('"you" is written once for starting points close enough to run together', (
   assert.deepEqual(near.text, ['you', ''])
   const far = mapFigure([leeds, santander], 'sao-paulo', TOKENS).data.find(t => t.name === 'origin')
   assert.deepEqual(far.text, ['you', 'you'])
+})
+
+test('mapHeight gives the box the map needs at its width, and the legend beneath it', () => {
+  // The world's frame is 1.92 wide to 1 tall at every zoom (measured at 390 and 1280 px),
+  // with 8 px of margin on each side. A phone's 324 px box: 308 / 1.92 = 160.4, so 160 of
+  // map and 16 of margin.
+  assert.equal(mapHeight(324), 176)
+  assert.equal(mapHeight(324, 44), 220) // two rows of legend under it
+  // A desktop's 1146 px would want 580 px of map; the box stops at 500, as it always has.
+  assert.equal(mapHeight(1146, 22), 500)
+  assert.equal(mapHeight(0), 16)
+})
+
+test('the legend sits under the map, where it cannot cover it', () => {
+  const two = mapFigure([run('a', LONDON_THEN_NOTHING), run('b', LONDON_THEN_NOTHING)],
+    'sao-paulo', TOKENS)
+  assert.equal(two.layout.legend.orientation, 'h')
+  assert.equal(two.layout.legend.y, 0)
+  assert.equal(two.layout.legend.yanchor, 'top')
 })

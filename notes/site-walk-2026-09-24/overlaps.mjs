@@ -67,8 +67,13 @@ for (const [tag, width] of widths) {
         const geo = fig.querySelector('.geo .bg, .geolayer .bg')
         if (geo) {
           const g = geo.getBoundingClientRect(), f = fig.getBoundingClientRect()
-          out.maps.push({ heading: heading.trim().slice(0, 40), map: Math.round(g.height),
-            box: Math.round(f.height), share: +(g.height / f.height).toFixed(2) })
+          // A legend under the map is the box doing its job, not blank space, so it counts
+          // with the map; one drawn over the map is already inside the map's height.
+          const legend = fig.querySelector('.legend')
+          const l = legend && legend.getBoundingClientRect()
+          const beside = l && (l.top >= g.bottom - 1 || l.bottom <= g.top + 1) ? l.height : 0
+          out.maps.push({ heading: heading.trim().slice(0, 40), map: Math.round(g.height + beside),
+            box: Math.round(f.height), share: +((g.height + beside) / f.height).toFixed(2) })
         }
       }
       // Names a reader uses to tell runs apart: each chart's legend, the run tiles, the

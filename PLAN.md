@@ -221,7 +221,15 @@ Approved 2026-09-24 as recommended: decisions 1 to 3 as written, and decision 4 
 - Parallel: yes, beside steps 8 and 9 — JavaScript only, since step 11 already wrote the
   Python half
 
-**Step 7. The explorer map's height follows its width**
+**Step 7. The explorer map's height follows its width — DONE**
+- Done: the world's frame measured 1.92 wide to 1 tall at every zoom and width, so
+  `mapHeight(width, legendPx)` is exact arithmetic (tests at 324, 1146 and 0 px). The legend
+  moved under the map at every width, so it can never cover it; `app.js` presizes the box
+  for one legend row, then `fitMap` fits it to the legend plotly actually drew, on draw, on
+  target change and 150 ms after a resize. `overlaps.mjs` now counts a legend under the
+  map with the map. Phone 0.32 to 0.92, desktop 0.97 unchanged; resizing 1280 to 390 to
+  1280 refits each time. Seen on the way, not changed: "Fortaleza (EllaLink)" is cut by the
+  map's bottom edge, as it already was on a desktop. Node: 176.
 - Needs: `map.js` (`mapHeight`); `app.js` draws the map and redraws it on resize
 - Thinking: medium — main session
 - Check: a node test of `mapHeight` against hand-worked widths; `overlaps.mjs` shows the
