@@ -29,6 +29,7 @@ const browser = await chromium.launch({ executablePath: process.env.HOME +
   '/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome' })
 let total = 0
 let dupes = 0
+let failed = 0
 for (const [tag, width] of widths) {
   const ctx = await browser.newContext({ viewport: { width, height: 900 }, isMobile: tag === 'phone' })
   for (const [name, url] of pages) {
@@ -67,17 +68,27 @@ for (const [tag, width] of widths) {
             box: Math.round(f.height), share: +(g.height / f.height).toFixed(2) })
         }
       }
-      // Names a reader uses to tell runs apart: each chart's legend, the run tiles and the
-      // timeline titles. A name shown twice in one of these says nothing about which is which.
+      // Names a reader uses to tell runs apart: each chart's legend, the run tiles, the
+      // timeline titles, the comparison table's heads and the map caption. A name shown twice in one of these says nothing about which is which.
       const groups = [...document.querySelectorAll('.js-plotly-plot')]
         .map((fig) => [...fig.querySelectorAll('.legendtext')].map((t) => t.textContent.trim()))
       groups.push([...document.querySelectorAll('.runs .run .name')].map((t) => t.textContent.trim()))
       groups.push([...document.querySelectorAll('.ctitle')].map((t) => t.textContent.trim()))
+      // the comparison table's column heads, less the first, which names the target
+      groups.push([...document.querySelectorAll('.diff thead th')].slice(1).map((t) => t.textContent.trim()))
+      // the map caption names a run before each route-date sentence: "leeds_bt: Traced on …"
+      for (const note of document.querySelectorAll('.note')) {
+        const named = [...note.textContent.matchAll(/(?:^|\.\s)([^.]*?): (?:Traced on|When this route)/g)]
+        if (named.length) groups.push(named.map((m) => m[1].trim()))
+      }
       out.dupes = groups.reduce((n, g) => n + g.length - new Set(g).size, 0)
+      out.charts = document.querySelectorAll('.js-plotly-plot').length
       return out
     }, MIN_SIDE)
     total += found.pairs.length
     dupes += found.dupes
+    // A page that did not draw has nothing to overlap, so it would read as a clean 0.
+    if (!found.charts) { failed += 1; console.log(`${tag.padEnd(5)} ${name.padEnd(24)} DID NOT DRAW`); await page.close(); continue }
     console.log(`${tag.padEnd(5)} ${name.padEnd(24)} overlaps=${found.pairs.length} repeated names=${found.dupes}` +
       found.maps.map((m) => `  map ${m.map}/${m.box} px (${m.share})`).join(''))
     // one line per kind of collision on this page, with how many figures repeat it
@@ -93,4 +104,6 @@ for (const [tag, width] of widths) {
   await ctx.close()
 }
 await browser.close()
-console.log(`overlapping pairs in total: ${total}; repeated names in total: ${dupes}`)
+console.log(`overlapping pairs in total: ${total}; repeated names in total: ${dupes}` +
+  (failed ? `; ${failed} page(s) DID NOT DRAW, so these totals are not a result` : ''))
+if (failed) process.exitCode = 1

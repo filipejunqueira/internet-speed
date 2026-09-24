@@ -22,13 +22,19 @@ say which is which. On a phone, the map fills a third of its box and the rest is
 ## What the measurement found
 
 `notes/site-walk-2026-09-24/overlaps.mjs` loads six states of the live site (four explorer
-comparisons, two report pages) at 1280 px and 390 px. It lists every pair of text boxes in
-one chart that overlap by at least 3 × 3 px, counts names repeated within one legend, the
-tiles or the timeline titles, and says how much of its box each map fills. The 3 px floor
-was calibrated: a legend under a title grazes by 1.3 to 2.0 px with no ink touching, and the
-real collisions measured 11 to 14 px. Live baseline, saved in `overlaps-before.txt` beside
-the script: **127 overlapping pairs, 60 repeated names, maps filling 0.32 and 0.33 of their
-box at 390 px** (0.97 and 0.94 at 1280 px).
+comparisons, two report pages) at 1280 px and 390 px. It does four things:
+- lists every pair of text boxes in one chart that overlap by at least 3 × 3 px;
+- counts names repeated within one legend, the run tiles, the timeline titles, the
+  comparison table's column heads, or the map caption's route-date sentences;
+- says how much of its box each map fills;
+- fails, rather than reporting a clean 0, when a page did not draw (one load did, while the
+  baseline was being taken).
+
+The 3 px floor was calibrated. A legend under a title grazes by 1.3 to 2.0 px with no ink
+touching, and the real collisions measured 11 to 14 px. The floor also drops one pair of
+axis tick labels at 390 px that a looser rule counted. Live baseline, saved in
+`overlaps-before.txt` beside the script: **127 overlapping pairs, 80 repeated names, maps
+filling 0.32 and 0.33 of their box at 390 px** (0.97 and 0.94 at 1280 px).
 
 The nine kinds, with the code that draws each:
 
@@ -47,9 +53,15 @@ The nine kinds, with the code that draws each:
 Kinds 1, 2, 3, 6 and 8 are the five in TODO.md. Kinds 4, 5, 7 and 9 are new, found by the
 measurement.
 
-How the page names a run today: `dom.runName(row)` returns `row.label || row.id`, and every
-surface calls it: legends (`figures.js`, `map.js`), tiles (`dom.js`), timeline titles and
-the "would not load" sentence (`app.js`), and the map caption (`map.js` `datedRoutes`).
+How the page names a run today: `dom.runName(row)` returns `row.label || row.id`. It is
+called for:
+- the legends (`figures.js`, `map.js`);
+- the tiles (`dom.js`);
+- the timeline titles and the "would not load" sentence (`app.js`, through `nameOf`);
+- the map caption (`map.js` `datedRoutes`).
+
+The comparison table's column heads use a second function, `dom.shortName(row)`, which
+returns `label || id.slice(0, 10)` and so would miss a fix made only in `runName`.
 
 ## Decisions for you
 
@@ -68,20 +80,27 @@ the "would not load" sentence (`app.js`), and the map caption (`map.js` `datedRo
 3. **Label a shared map end point once**, with the target's name, instead of once per run;
    and write "you" once when origins sit on top of each other. Runs stay named by the legend
    and on hover.
-4. **Charts get taller.** Legend and line labels each get their own row above the plot, so
-   report histograms and timelines grow by about one row (16 px) each.
+4. **Serial, or two branches at once.** Once step 11 has put `labelSide` in place, the
+   JavaScript steps (2 to 7) and the Python steps (8 and 9) touch no file in common. They
+   could run as two agents, one in a git worktree, each serving its own local build on its
+   own port. That would save about an hour of waiting, at the cost of two agents that
+   write files. My default is serial in this session: each step is look, adjust and look
+   again, which works better with one pair of eyes on one build. Say yes if you want the
+   two branches instead.
 
 ## Data first
 
 - `displayName`: a field the explorer sets on its own in-memory copy of a ticked run. It is
   never written to a record, the log or the site's JSON. `dom.runName(row)` becomes
-  `row.displayName || row.label || row.id`, so every existing caller picks it up with no
-  change of its own. Checked: `displayName` is used nowhere today; records use `name` for
-  targets, so that key is avoided.
+  `row.displayName || row.label || row.id` and `dom.shortName(row)` reads `displayName`
+  first too, so every existing caller picks it up with no change of its own. Checked:
+  `displayName` is used nowhere today; records use `name` for targets, so that key is
+  avoided.
 - `labelSide`: per target, which side of its end point the map label goes, e.g.
-  `{"us-east": "middle left"}` with `middle right` for the rest. Defined once in Python and
-  emitted in the tokens block, per the project's rule that the site's JavaScript does not
-  hold its own copies of Python's constants.
+  `{"us-east": "middle left"}` with `middle right` for the rest. Defined once in
+  `render_map.py`, used there by the report map, and emitted in the tokens block for the
+  explorer, per the project's rule that the site's JavaScript holds no copies of Python's
+  constants.
 
 ## Interfaces
 
@@ -98,12 +117,21 @@ the "would not load" sentence (`app.js`), and the map caption (`map.js` `datedRo
 
 **Step 1. A local copy of the site to test against**
 - Needs: the container's site clone; `overlaps.mjs`; the build used for the contrast check
-  earlier today, turned into `notes/site-walk-2026-09-24/build_local.py`
+  earlier today, turned into `notes/site-walk-2026-09-24/build_local.py`, which copies the
+  clone without its `.git`
 - Thinking: light — main session
 - Check: `uv run python notes/site-walk-2026-09-24/build_local.py <dir>`, serve it, then
   `node notes/site-walk-2026-09-24/overlaps.mjs http://127.0.0.1:8765/` runs and prints its
   totals; that is the local baseline, recorded here
 - Parallel: no — every later check uses it
+
+**Step 11. `labelSide`, in Python and in the tokens block**
+- Needs: `render_map.py` (the constant); `render_web.py` `explorer_tokens`;
+  `tests/test_render_web.py`
+- Thinking: light — main session
+- Check: `uv run pytest tests/test_render_web.py -q` with a test that the tokens block
+  carries `labelSide` and that it is the same object `render_map.py` uses
+- Parallel: no — both branches read it, so it lands before either starts
 
 ### Part B — names
 
@@ -113,15 +141,19 @@ the "would not load" sentence (`app.js`), and the map caption (`map.js` `datedRo
 - Check: `node --test "tests/js/dom.test.js"`, with cases for three runs on one day, two on
   different days, two at the same time on different days, an unlabelled run beside a
   labelled one, and no clash at all
-- Parallel: no — runs in the main session one step at a time, because every check shares
-  the one local build and port. `dom.js` is touched by no other step
+- Parallel: yes, beside steps 8 and 9 — `dom.js` and its test are touched by no Python
+  step. Runs as a branch only on your yes (decision 4)
 
 **Step 3. Wire the names into every surface**
 - Needs: step 2; `app.js` (where the ticked runs are loaded, and `nameOf`); `dom.runName`
+  and `dom.shortName`; `map.js` `datedRoutes`
 - Thinking: medium — main session
-- Check: `node overlaps.mjs <local>` prints `repeated names in total: 0` (baseline 60), and
-  `node --test "tests/js/*.test.js"` is green
-- Parallel: no — `app.js` is touched again in step 7
+- Check: `node overlaps.mjs <local>` prints `repeated names in total: 0` (baseline 80); a
+  node test that `datedRoutes` gives two runs sharing a label two different names; one
+  browser load with a run's JSON blocked (`page.route`) shows the "would not load"
+  sentence with that run's distinct name; `node --test "tests/js/*.test.js"` green
+- Parallel: yes, beside steps 8 and 9 — JavaScript files only. Inside the JavaScript branch
+  it waits on step 2, and `app.js` is touched again in step 7
 
 ### Part C — explorer charts
 
@@ -132,30 +164,34 @@ the "would not load" sentence (`app.js`), and the map caption (`map.js` `datedRo
 - Check: a node test that the legend sits above the label row, and "upload" a row below
   "download"; `overlaps.mjs` shows 0 pairs in "Extra delay…" and "Round trip … through
   each run" at both widths
-- Parallel: no — `figures.js` again in step 5
+- Parallel: yes, beside steps 8 and 9 — JavaScript files only; inside its branch,
+  `figures.js` is step 5's next
 
 **Step 5. Histogram without the peak labels**
 - Needs: decision 2; `figures.js` `histogramFigure`
 - Thinking: light — main session
 - Check: a node test that the histogram's traces carry no text and the legend is shown for
   two or more runs; `overlaps.mjs` shows 0 pairs in "Where the round trips … fell"
-- Parallel: no — same file as step 4
+- Parallel: yes, beside steps 8 and 9 — JavaScript only; after step 4, same file
 
 **Step 6. Map labels: a shared end point once, "you" once, us-east to the west**
-- Needs: decision 3; `map.js` `mapFigure`; `labelSide` added to the tokens block in
-  `render_web.py`; `tests/js/map.test.js`
+- Needs: decision 3; step 11's `labelSide` in the tokens; `map.js` `mapFigure`, whose
+  comment "so identity never rests on colour alone" is rewritten to say the legend now
+  does that; `tests/js/map.test.js`
 - Thinking: medium — main session
 - Check: node tests for one label at a shared end point, one "you" for collapsed origins,
   and the side taken from the tokens; `overlaps.mjs` shows 0 pairs in "The route to…" at
   both widths
-- Parallel: no — `render_web.py` is also step 8's
+- Parallel: yes, beside steps 8 and 9 — JavaScript only, since step 11 already wrote the
+  Python half
 
 **Step 7. The explorer map's height follows its width**
 - Needs: `map.js` (`mapHeight`); `app.js` draws the map and redraws it on resize
 - Thinking: medium — main session
 - Check: a node test of `mapHeight` against hand-worked widths; `overlaps.mjs` shows the
   explorer map filling at least 0.8 of its box at 390 px and at least 0.9 at 1280 px
-- Parallel: no — `app.js` was step 3's, `map.js` step 6's
+- Parallel: yes, beside steps 8 and 9 — JavaScript only; after step 3 (`app.js`) and step 6
+  (`map.js`)
 
 ### Part D — report pages
 
@@ -165,20 +201,21 @@ the "would not load" sentence (`app.js`), and the map caption (`map.js` `datedRo
 - Check: `uv run pytest tests/test_render_web.py -q` with a test that "median" sits on a
   different row from "best" and "p95", "upload" below "download", and the legend above both;
   `overlaps.mjs` shows 0 pairs in the report's target sections at both widths
-- Parallel: no — `render_web.py` again in step 9
+- Parallel: yes, beside steps 2 to 7 — Python files only, after step 11; inside its branch,
+  `render_web.py` is step 9's next
 
 **Step 9. Report map: us-east to the west, height from width**
-- Needs: step 6's `labelSide`; `render_map.py` end-point labels; the map section and page
+- Needs: step 11's `labelSide`; `render_map.py` end-point labels; the map section and page
   script in `render_web.py`
 - Thinking: medium — main session
 - Check: `uv run pytest tests/test_render_map.py -q`; `overlaps.mjs` shows 0 pairs in
   "route map" and the report map filling at least 0.8 of its box at 390 px
-- Parallel: no — `render_web.py` was step 8's
+- Parallel: yes, beside steps 2 to 7 — Python only; after step 8, same file
 
 ### Part E — close
 
 **Step 10. Gate, look, publish, record**
-- Needs: steps 1 to 9
+- Needs: steps 1 to 9 and 11
 - Thinking: medium — main session
 - Check: `uv run ruff check .` and `uv run pytest tests -q` and
   `node --test "tests/js/*.test.js"` all green; on the local build, `overlaps.mjs` totals 0
@@ -191,7 +228,9 @@ the "would not load" sentence (`app.js`), and the map caption (`map.js` `datedRo
 
 - [ ] `overlaps.mjs` on the local build: 0 overlapping pairs at 1280 and 390 px across all
       six page states (live baseline 127).
-- [ ] 0 repeated names in any legend, tile row or timeline title set (baseline 60).
+- [ ] 0 repeated names in any legend, the tiles, the timeline titles, the comparison table's
+      heads or the map caption (baseline 80); the "would not load" sentence names a blocked
+      run by its distinct name.
 - [ ] Both maps fill at least 0.8 of their box at 390 px (baseline 0.32 and 0.33) and at
       least 0.9 at 1280 px (now 0.97 and 0.94).
 - [ ] `contrast.mjs`: lowest text outside the map still at or above 4.5:1, both themes.
@@ -227,8 +266,15 @@ Each is a rule already set elsewhere; the source is named.
 
 ## Risks and rollback
 
-- Label rows make charts taller; if a page reads worse for it, step 10's screenshots are
-  where that shows. Rollback is `git revert` of the step's commit.
+- Charts get taller. The legend and the line labels each get their own row above the plot,
+  so report histograms and timelines grow by about one row (16 px) each. If a page reads
+  worse for it, step 10's screenshots are where that shows. Rollback is `git revert` of the
+  step's commit.
+- The explorer map's legend sits inside the map area (`x: 0.01, y: 0.99`). At 390 px it
+  lands in today's blank space above the map; once step 7 makes the map fill its box, three
+  legend entries will sit over North America. That is text over land, not text over text,
+  so `overlaps.mjs` will not see it. Step 10's phone screenshot is the check, and moving
+  the legend out of the map at narrow widths is the likely fix.
 - Plotly places a legend in paper units, not pixels, so a label row depends on the figure's
   height. Each figure's height is fixed in code, and the rows are worked out from it; the
   overlap measurement at two widths is what proves it.

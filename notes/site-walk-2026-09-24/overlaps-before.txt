@@ -1,11 +1,11 @@
-desk  three Leeds, São Paulo   overlaps=4 repeated names=12  map 485/500 px (0.97)
+desk  three Leeds, São Paulo   overlaps=4 repeated names=16  map 485/500 px (0.97)
           1×  [Extra delay while the line is busy] legend "leeds_bt"  x  annotation "warning"
           3×  [The route to São Paulo] mark "leeds_bt"  x  mark "leeds_bt"
-desk  three Leeds, London      overlaps=5 repeated names=12  map 485/500 px (0.97)
+desk  three Leeds, London      overlaps=5 repeated names=16  map 485/500 px (0.97)
           1×  [Extra delay while the line is busy] legend "leeds_bt"  x  annotation "warning"
           1×  [Where the round trips to London fell] mark "leeds_bt"  x  mark "leeds_bt"
           3×  [The route to London] mark "leeds_bt"  x  mark "leeds_bt"
-desk  three mixed, US-East     overlaps=8 repeated names=6  map 485/500 px (0.97)
+desk  three mixed, US-East     overlaps=8 repeated names=8  map 485/500 px (0.97)
           1×  [Extra delay while the line is busy] legend "…"  x  annotation "warning"
           1×  [Where the round trips to US-East fell] mark "…"  x  legend "…"
           2×  [The route to US-East] mark "…"  x  mark "leeds_bt"
@@ -45,16 +45,16 @@ desk  report 2026-09-03        overlaps=11 repeated names=0  map 491/520 px (0.9
           1×  [sao-paulo] legend "idle"  x  annotation "…"
           1×  [sao-paulo] annotation "…"  x  annotation "…"
           1×  [route map] mark "us-east"  x  mark "New York"
-phone three Leeds, São Paulo   overlaps=7 repeated names=12  map 161/500 px (0.32)
+phone three Leeds, São Paulo   overlaps=7 repeated names=16  map 161/500 px (0.32)
           1×  [Extra delay while the line is busy] legend "leeds_bt"  x  annotation "warning"
           3×  [Round trip to São Paulo through each run] annotation "download"  x  annotation "upload"
           3×  [The route to São Paulo] mark "leeds_bt"  x  mark "leeds_bt"
-phone three Leeds, London      overlaps=8 repeated names=12  map 161/500 px (0.32)
+phone three Leeds, London      overlaps=8 repeated names=16  map 161/500 px (0.32)
           1×  [Extra delay while the line is busy] legend "leeds_bt"  x  annotation "warning"
           1×  [Where the round trips to London fell] mark "leeds_bt"  x  mark "leeds_bt"
           3×  [Round trip to London through each run] annotation "download"  x  annotation "upload"
           3×  [The route to London] mark "leeds_bt"  x  mark "leeds_bt"
-phone three mixed, US-East     overlaps=14 repeated names=6  map 161/500 px (0.32)
+phone three mixed, US-East     overlaps=14 repeated names=8  map 161/500 px (0.32)
           1×  [Extra delay while the line is busy] mark "…"  x  legend "leeds_bt"
           1×  [Extra delay while the line is busy] legend "…"  x  annotation "warning"
           1×  [Extra delay while the line is busy] legend "leeds_bt"  x  annotation "critical"
@@ -115,4 +115,4 @@ phone report 2026-09-03        overlaps=22 repeated names=0  map 169/520 px (0.3
           1×  [sao-paulo] annotation "…"  x  annotation "…"
           1×  [sao-paulo] annotation "download"  x  annotation "upload"
           1×  [route map] mark "us-east"  x  mark "New York"
-overlapping pairs in total: 127; repeated names in total: 60
+overlapping pairs in total: 127; repeated names in total: 80
