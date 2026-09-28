@@ -6,3 +6,4 @@ __pycache__/
 dist/
 notes/snapshots/
 notes/reports/
+.claude/settings.local.json
