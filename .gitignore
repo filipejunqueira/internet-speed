@@ -7,3 +7,5 @@ dist/
 notes/snapshots/
 notes/reports/
 .claude/settings.local.json
+# working files a later step or session reruns, such as a local build of the site
+tmp/
