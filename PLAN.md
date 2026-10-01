@@ -255,21 +255,17 @@ Approved 2026-09-24 as recommended: decisions 1 to 3 as written, and decision 4 
 - Parallel: yes, beside steps 2 to 7 — Python files only, after step 11; inside its branch,
   `render_web.py` is step 9's next
 
-**Step 9. Report map: us-east to the west, height from width**
-- Next session starts here. Found while reading, before any edit (2026-09-24):
-  - The map's shape, 1.92 wide to 1 tall, is needed by the report page's script as well as
-    `map.js`, so it moves to Python as `render_map.GEO_ASPECT`, goes out in the tokens as
-    `geoAspect`, and `map.mapHeight` takes it as an argument (`app.js` passes
-    `tokens.geoAspect`). Invariant 3; the tokens test in `tests/test_publish.py` gains the key.
-  - `map_figure` (report and map-only page): legend under the map, horizontal, as in
-    step 7; end labels take `LABEL_SIDE.get(name, "middle right")`, cable landings
-    `LABEL_SIDE.get(name, "bottom center")`. No map_figure test exists yet in
-    `tests/test_render_map.py`; add one.
-  - `build_report` sets `height=520` and `margin t=30` on the map, and plotly's HTML wraps
-    the `#map` div in a second div fixed at 520 px. A fitting script must set that
-    wrapper's height and call `Plotly.relayout(div, {height})`, because a fixed
-    `layout.height` ignores the box. Emit it beside `_theme_js()` (line ~760), from Python
-    constants for the aspect, the top margin and the 520 px cap.
+**Step 9. Report map: us-east to the west, height from width — DONE**
+- Done (2026-10-01): `render_map.GEO_ASPECT` goes out in the tokens as `geoAspect` and
+  `map.mapHeight` takes it; `map_figure` puts its legend under the map and its end and
+  landing labels on `LABEL_SIDE`; `_map_fit_js` fits the report map's box after each draw
+  and resize. The code was written on 2026-09-28 by a session that left no record; this
+  session checked it. Deviation: once the map filled its box on a phone, "you" printed into
+  the second line of the map's own title, which also ran off the right edge, so the report
+  page drops that title (it repeated the h1 and each target's timing estimate); the
+  map-only page keeps it. Local build: report pages 0 pairs at both widths, map 0.87 of its
+  box at 390 px and 0.94 at 1280 px. Seen, not this plan's: in dark mode the lakes stay
+  white and the black origin star nearly vanishes.
 - Needs: step 11's `labelSide`; `render_map.py` end-point labels; the map section and page
   script in `render_web.py`
 - Thinking: medium — main session

@@ -22,7 +22,8 @@ const TOKENS = {
   },
   font: 'system-ui, sans-serif',
   labelSide: { london: 'middle right', madrid: 'middle right', 'us-east': 'top left',
-    'sao-paulo': 'middle right', 'New York': 'bottom right' }
+    'sao-paulo': 'middle right', 'New York': 'bottom right' },
+  geoAspect: 1.92
 }
 
 const LEEDS = [53.8, -1.76]
@@ -563,11 +564,15 @@ test('mapHeight gives the box the map needs at its width, and the legend beneath
   // The world's frame is 1.92 wide to 1 tall at every zoom (measured at 390 and 1280 px),
   // with 8 px of margin on each side. A phone's 324 px box: 308 / 1.92 = 160.4, so 160 of
   // map and 16 of margin.
-  assert.equal(mapHeight(324), 176)
-  assert.equal(mapHeight(324, 44), 220) // two rows of legend under it
+  // The aspect comes from Python through the tokens, so the test passes it in the same way.
+  const aspect = TOKENS.geoAspect
+  assert.equal(mapHeight(324, aspect), 176)
+  assert.equal(mapHeight(324, aspect, 44), 220) // two rows of legend under it
   // A desktop's 1146 px would want 580 px of map; the box stops at 500, as it always has.
-  assert.equal(mapHeight(1146, 22), 500)
-  assert.equal(mapHeight(0), 16)
+  assert.equal(mapHeight(1146, aspect, 22), 500)
+  assert.equal(mapHeight(0, aspect), 16)
+  // A wider frame needs less height: 308 / 2 = 154, plus the margins.
+  assert.equal(mapHeight(324, 2), 170)
 })
 
 test('the legend sits under the map, where it cannot cover it', () => {

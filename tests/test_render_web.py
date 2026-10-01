@@ -356,3 +356,33 @@ def test_line_and_band_labels_get_rows_of_their_own_under_the_legend():
     assert {a.text: a.yshift for a in line.annotations} == {"download": 14, "upload": 0}
     line_px = line.height - line.margin.t - line.margin.b
     assert (line.legend.y - 1) * line_px == pytest.approx(2 * 14 + 8)
+
+
+def test_the_report_map_sizes_its_box_from_its_width():
+    """The map's box follows its width on a report page too, from the Python constants.
+
+    Plotly writes the map with a fixed 520 px height, which on a phone left two thirds of the
+    box blank. A script fits it once the map is drawn and again after a resize; a page with
+    no map has nothing to fit and carries no such script.
+    """
+    from pingme.render_map import GEO_ASPECT
+    from pingme.render_web import REPORT_MAP_MAX_PX, REPORT_MAP_TOP_PX
+
+    run = json.loads(FIXTURE.read_text())
+    traces = {"london": {"error": None,
+                         "hops": [{"n": 1, "ip": "1.2.3.4", "avg_ms": 9.0, "loss_pct": 0.0}],
+                         "locations": [{"ip": "1.2.3.4", "lat": 51.5, "lon": -0.1,
+                                        "city": "London", "source": "ip-api",
+                                        "hostname": None}]}}
+    page = build_report(run, traces)
+    assert f"ASPECT={GEO_ASPECT}," in page
+    assert f"TOP={REPORT_MAP_TOP_PX}," in page and f"MAX={REPORT_MAP_MAX_PX}," in page
+    # The script's own line, not the bare event name, which the embedded plotly.js holds too
+    fits = "div.on('plotly_afterplot', fit)"
+    assert fits in page
+    assert f'<div style="height:{REPORT_MAP_MAX_PX}px; width:100%;">' in page
+    assert fits not in build_report(run)
+    # No title of its own: it repeated the page's heading and each target's timing
+    # estimate, and once the map filled its box on a phone, "you" over the UK printed
+    # into the title's second line, which also ran off the right edge
+    assert "pingme routes" not in page

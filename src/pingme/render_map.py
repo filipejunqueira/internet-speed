@@ -23,6 +23,11 @@ REFERENCE_POINTS = {"Sines (EllaLink)": SINES, "Fortaleza (EllaLink)": FORTALEZA
 # New York below and east, over the Atlantic.
 LABEL_SIDE = {"london": "middle right", "madrid": "middle right", "us-east": "top left",
               "sao-paulo": "middle right", "New York": "bottom right"}
+# The world's frame is 1.92 wide to 1 tall at every zoom (natural earth, measured on the
+# explorer at 390 and 1280 px), so the height a map needs follows from its width. Both maps
+# size their box by it: the explorer's through the tokens block, the report's in its own
+# script.
+GEO_ASPECT = 1.92
 # dataviz categorical slots 1-4 (validated for adjacent-pair colour-blind separation)
 COLOURS = {"london": "#2a78d6", "madrid": "#eb6834", "us-east": "#1baf7a",
            "sao-paulo": "#eda100", "router": "#898781", "isp-hop": "#898781"}
@@ -263,7 +268,8 @@ def map_figure(run: dict, traces: dict, note: str | None = None) -> go.Figure:
         # direct label at the far end so identity never rests on colour alone
         fig.add_trace(go.Scattergeo(
             lat=[p[0] for p in pts], lon=[p[1] for p in pts], mode="markers+text",
-            text=[""] * (len(pts) - 1) + [name], textposition="middle right",
+            text=[""] * (len(pts) - 1) + [name],
+            textposition=LABEL_SIDE.get(name, "middle right"),
             textfont={"size": 11}, marker={"size": 7, "color": colour},
             legendgroup=name, showlegend=False, meta={"role": name},
             hovertext=[f"{p[2]}<br>{name}: physics says {verdict}" for p in pts],
@@ -271,7 +277,8 @@ def map_figure(run: dict, traces: dict, note: str | None = None) -> go.Figure:
     fig.add_trace(go.Scattergeo(
         lat=[v[0] for v in REFERENCE_POINTS.values()],
         lon=[v[1] for v in REFERENCE_POINTS.values()],
-        mode="markers+text", text=list(REFERENCE_POINTS), textposition="bottom center",
+        mode="markers+text", text=list(REFERENCE_POINTS),
+        textposition=[LABEL_SIDE.get(name, "bottom center") for name in REFERENCE_POINTS],
         marker={"size": 6, "color": "rgba(137,135,129,0.6)", "symbol": "diamond"},
         textfont={"size": 10, "color": "#898781"}, name="cable landing points",
         hoverinfo="text"))
@@ -289,7 +296,11 @@ def map_figure(run: dict, traces: dict, note: str | None = None) -> go.Figure:
     subtitle = f"{verdicts}<br>{note}" if note else verdicts
     fig.update_layout(title=f"pingme routes — {run['id']}<br><sup>{subtitle}</sup>",
                       margin={"l": 10, "r": 10, "t": 90 if note else 70, "b": 10},
-                      legend={"x": 0.01, "y": 0.99})
+                      # Under the map, not on it: on a phone the map fills its box, and a
+                      # legend in the corner would sit over North America. Plotly widens
+                      # the bottom margin to fit it.
+                      legend={"orientation": "h", "x": 0, "xanchor": "left", "y": 0,
+                              "yanchor": "top"})
     return fig
 
 

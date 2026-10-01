@@ -14,7 +14,13 @@ from pathlib import Path
 
 import pytest
 
-from pingme.render_map import TRACE_WITH_RUN_GRACE_S, trace_note
+from pingme.render_map import (
+    LABEL_SIDE,
+    REFERENCE_POINTS,
+    TRACE_WITH_RUN_GRACE_S,
+    map_figure,
+    trace_note,
+)
 
 CASES = json.loads((Path(__file__).parent / "fixtures" / "trace-note-cases.json")
                    .read_text(encoding="utf-8"))["cases"]
@@ -64,3 +70,34 @@ def test_trace_run_stamps_every_route_with_one_moment(monkeypatch):
     when = dt.datetime.fromisoformat(stamps.pop())
     assert when.utcoffset() == dt.timedelta(0)  # an offset is written, and it is UTC
     assert before <= when <= after
+
+
+def _trace_via_london() -> dict:
+    """A route with one hop placed in London, so the map has a leg to draw and an end."""
+    return {"error": None, "hops": [{"n": 1, "ip": "1.2.3.4", "avg_ms": 9.0, "loss_pct": 0.0}],
+            "locations": [{"ip": "1.2.3.4", "lat": 51.5, "lon": -0.1, "city": "London",
+                           "source": "ip-api", "hostname": None}]}
+
+
+def test_map_labels_take_their_side_from_the_table_and_the_legend_sits_under_the_map():
+    """The report map places its names as the explorer's does, from the one table.
+
+    US-East's end point sits about four pixels from New York on a phone, so the two names
+    go to opposite sides; every other end keeps "middle right" and every other landing
+    "bottom center". The legend goes under the map, where it cannot cover North America.
+    """
+    run = json.loads((Path(__file__).parent / "fixtures" / "run.json").read_text())
+    fig = map_figure(run, {"london": _trace_via_london(), "us-east": _trace_via_london()})
+
+    ends = {t.meta["role"]: t.textposition for t in fig.data
+            if t.mode == "markers+text" and t.meta and t.meta.get("role") in LABEL_SIDE}
+    assert ends == {"london": "middle right", "us-east": "top left"}
+
+    landings = next(t for t in fig.data if t.name == "cable landing points")
+    sides = dict(zip(landings.text, landings.textposition, strict=True))
+    assert sides == {name: LABEL_SIDE.get(name, "bottom center") for name in REFERENCE_POINTS}
+    assert sides["New York"] == "bottom right"
+
+    legend = fig.layout.legend
+    assert (legend.orientation, legend.x, legend.xanchor, legend.y, legend.yanchor) == \
+        ("h", 0, "left", 0, "top")

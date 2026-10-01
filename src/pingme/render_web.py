@@ -20,6 +20,7 @@ from plotly.offline import get_plotlyjs
 
 from .probe import INTERVAL_S
 from .render_map import (
+    GEO_ASPECT,
     LABEL_SIDE,
     TRACE_QUERIES,
     hop_rows,
@@ -562,6 +563,7 @@ def explorer_tokens(site: Path | None = None) -> dict:
         "topojsonUrl": "assets/" if site is not None and (site / TOPOJSON_ASSET).exists()
                        else None,
         "labelSide": dict(LABEL_SIDE),
+        "geoAspect": GEO_ASPECT,
     }
 
 
@@ -602,6 +604,47 @@ def _theme_js() -> str:
   }}
   apply(); matchMedia('(prefers-color-scheme: dark)').addEventListener('change', apply);
   new MutationObserver(apply).observe(document.documentElement,{{attributes:true,attributeFilter:['data-theme']}});
+}})();
+"""
+
+
+# The report map's box: at most the 520 px it always had, 30 px above the map, where "you"
+# over the UK prints, no side margins. Its height follows its width below that, by the world
+# frame's aspect, with the legend's own height and a little air under the map.
+REPORT_MAP_MAX_PX = 520
+REPORT_MAP_TOP_PX = 30
+MAP_LEGEND_GAP_PX = 4
+MAP_FIT_DELAY_MS = 150
+
+
+def _map_fit_js() -> str:
+    """Fit the report map's box to its width, as the explorer's fitMap does for its own.
+
+    Plotly writes the map into a wrapper fixed at `REPORT_MAP_MAX_PX` with the same fixed
+    `layout.height`, and a fixed height ignores the box, so both are set. How the legend
+    wraps is only known once it is drawn, so this runs after each draw and a pause after a
+    resize, and measures twice at most: a resize can rewrap the legend once more.
+    """
+    return f"""
+(function(){{
+  const div=document.getElementById('map'); if(!div||!div.on) return;
+  const ASPECT={GEO_ASPECT}, TOP={REPORT_MAP_TOP_PX}, MAX={REPORT_MAP_MAX_PX}, GAP={MAP_LEGEND_GAP_PX};
+  let busy=false, timer=null;
+  async function fit(){{
+    if(busy) return; busy=true;
+    try{{
+      for(let pass=0;pass<2;pass++){{
+        const legend=div.querySelector('.legend');
+        const legendPx=legend?legend.getBoundingClientRect().height+GAP:0;
+        const height=Math.min(MAX,Math.round(div.clientWidth/ASPECT)+TOP+Math.round(legendPx));
+        if(Math.abs(div.clientHeight-height)<=1) break;
+        div.parentElement.style.height=height+'px';
+        await Plotly.relayout(div,{{height}});
+      }}
+    }} finally {{ busy=false; }}
+  }}
+  div.on('plotly_afterplot', fit);
+  addEventListener('resize',()=>{{clearTimeout(timer); timer=setTimeout(fit,{MAP_FIT_DELAY_MS});}});
 }})();
 """
 
@@ -712,7 +755,10 @@ def build_report(run: dict, traces: dict | None = None, *,
     map_html = ""
     if traces:
         fig = map_figure(run, traces)
-        fig.update_layout(height=520, margin={"l": 0, "r": 0, "t": 30, "b": 0},
+        # No title: the page's heading names the run and each target's section gives its
+        # timing estimate, and on a phone the title ran off the edge and under "you".
+        fig.update_layout(title={"text": ""}, height=REPORT_MAP_MAX_PX,
+                          margin={"l": 0, "r": 0, "t": REPORT_MAP_TOP_PX, "b": 0},
                           paper_bgcolor="rgba(0,0,0,0)", font={"family": FONT})
         # The map is the one figure that fetches anything: give it the site's own copy of
         # the world when this page is being published beside one.
@@ -757,7 +803,7 @@ whichever candidate comes closest, not a route anybody traced, so it is a guess 
 "added" figure can come out negative; that is noise, not a router giving time back. Routers
 often answer traceroute slowly or not at all on purpose, so an unanswered probe there says
 nothing about the traffic passing through.</p>
-</main><script>{_theme_js()}</script></body></html>"""
+</main><script>{_theme_js()}{_map_fit_js() if map_html else ""}</script></body></html>"""
 
 
 def write_report(run: dict, status=lambda msg: None, with_map: bool = True) -> str:

@@ -13,18 +13,20 @@
 // a world map is concerned; drawing the second one would add a hop of zero length.
 const COLLAPSE_DEG = 0.05
 
-// The world's frame is 1.92 wide to 1 tall at every zoom (natural earth, measured at 390 and
-// 1280 px), so the height a map needs follows from its width. The box stops at 500 px, the
-// height it always had, where a desktop's width would ask for more.
-const GEO_ASPECT = 1.92
+// The height a map needs follows from its width, by the world frame's width over its height
+// (`geoAspect` in the tokens, render_map.GEO_ASPECT). The box stops at 500 px, the height it
+// always had, where a desktop's width would ask for more.
 const MAP_MARGIN_PX = 8
 const MAP_MAX_PX = 500
 
-/** The height of a map box `width` wide whose legend, under the map, is `legendPx` tall. */
-export function mapHeight (width, legendPx = 0) {
+/**
+ * The height of a map box `width` wide, for a world frame `aspect` wide to 1 tall, whose
+ * legend, under the map, is `legendPx` tall.
+ */
+export function mapHeight (width, aspect, legendPx = 0) {
   const inner = Math.max(0, width - 2 * MAP_MARGIN_PX)
   return Math.min(MAP_MAX_PX,
-    Math.round(inner / GEO_ASPECT) + 2 * MAP_MARGIN_PX + Math.round(legendPx))
+    Math.round(inner / aspect) + 2 * MAP_MARGIN_PX + Math.round(legendPx))
 }
 
 // Two starting points closer than this in both latitude and longitude share one "you": a

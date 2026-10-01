@@ -502,7 +502,7 @@ function resolveTarget(live) {
  */
 function presizeMap() {
   const div = document.getElementById('fig-map')
-  if (div) div.style.height = `${mapHeight(div.clientWidth, MAP_LEGEND_ROW_PX)}px`
+  if (div) div.style.height = `${mapHeight(div.clientWidth, tokens.geoAspect, MAP_LEGEND_ROW_PX)}px`
 }
 
 /**
@@ -516,7 +516,7 @@ async function fitMap() {
   for (let pass = 0; pass < 2; pass++) {
     const legend = div.querySelector('.legend')
     const legendPx = legend ? legend.getBoundingClientRect().height + MAP_LEGEND_GAP_PX : 0
-    const height = mapHeight(div.clientWidth, legendPx)
+    const height = mapHeight(div.clientWidth, tokens.geoAspect, legendPx)
     if (Math.abs(div.clientHeight - height) <= 1) return
     div.style.height = `${height}px`
     await Plotly.Plots.resize(div)
