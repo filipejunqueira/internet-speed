@@ -1,13 +1,13 @@
 # TODO — internet-speed
 
-Last updated: 2026-09-24
+Last updated: 2026-10-01
 
 ## Now
 
 PLAN.md is open: no text over text on the site, and every run named apart. It covers the
 label-collision and duplicate-name items below and the phone-map item under Next. Steps
-1 to 8 and 11 are done and pushed; step 9 (the report map) and step 10 (check, publish,
-archive) are left, and none of it is on the live site yet. The site walk of 2026-09-24 is
+1 to 9 and 11 are done and pushed; step 10 has passed its local checks (2026-10-01) and
+waits on publishing, and none of it is on the live site yet. The site walk of 2026-09-24 is
 in `notes/site-walk-2026-09-24/README.md`.
 
 - [ ] Decide what to do about an old row in `runs/index.json` keeping numbers the code
@@ -78,6 +78,15 @@ Found by the site walk on 2026-09-24; evidence in `notes/site-walk-2026-09-24/`.
       starting near 15 is plotly fitting its range to data with no zeros in it
 - [ ] A ticked run's box fills solid ink with no check mark and reads as blacked out.
       Minor, a matter of taste
+
+Found 2026-10-01 on the local build, after step 9; evidence in `notes/site-walk-2026-10-01/`.
+
+- [ ] Phone: with three runs ticked, the explorer histogram's legend wraps to two rows and
+      the second ("leeds_bt 15:32") prints over the top of the plotted outlines
+      (`three-leeds-sp.phone.s04.png`). `overlaps.mjs` cannot see it: it measures text
+      against text, not text against marks. Desktop and two runs keep to one row
+- [ ] Dark mode: map lakes stay white and the black origin star nearly vanishes, on the
+      report map and likely the explorer's (`report-1359.desk-dark.s08.png`)
 
 ## Later
 
