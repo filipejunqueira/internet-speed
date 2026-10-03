@@ -275,7 +275,16 @@ Approved 2026-09-24 as recommended: decisions 1 to 3 as written, and decision 4 
 
 ### Part E — close
 
-**Step 10. Gate, look, publish, record**
+**Step 10. Gate, look, publish, record — DONE**
+- Done (2026-10-03): ruff clean, pytest 133 passed, node 177 passed. Local build:
+  `overlaps.mjs` 0 pairs and 0 repeated names across all 12 states, maps at 0.87 or more
+  of their box on a phone, `contrast.mjs` lowest 4.85:1. Reading the screenshots found one
+  thing the scripts do not measure: the three-run histogram's second legend row printed
+  over the plot on a phone, fixed by anchoring every explorer legend at its foot (2e38e70).
+  The vpn session confirmed the line free (2026-10-03 12:50). Republished 13:59 from the
+  container (site 16f186f); live `overlaps.mjs`: 0 pairs on every explorer state and the
+  13:59 report at both widths. The 33 pairs and 2.19:1 left are all on the 2026-09-03
+  report, built by old code, which only the user's log can republish.
 - Needs: steps 1 to 9 and 11
 - Thinking: medium — main session
 - Check: `uv run ruff check .` and `uv run pytest tests -q` and
@@ -287,19 +296,25 @@ Approved 2026-09-24 as recommended: decisions 1 to 3 as written, and decision 4 
 
 ## Success criteria
 
-- [ ] `overlaps.mjs` on the local build: 0 overlapping pairs at 1280 and 390 px across all
-      six page states (live baseline 127).
-- [ ] 0 repeated names in any legend, the tiles, the timeline titles, the comparison table's
+- [x] `overlaps.mjs` on the local build: 0 overlapping pairs at 1280 and 390 px across all
+      six page states (live baseline 127). 2026-10-03: 0 in every state, both widths.
+- [x] 0 repeated names in any legend, the tiles, the timeline titles, the comparison table's
       heads or the map caption (baseline 80); the "would not load" sentence names a blocked
-      run by its distinct name.
-- [ ] Both maps fill at least 0.8 of their box at 390 px (baseline 0.32 and 0.33) and at
-      least 0.9 at 1280 px (now 0.97 and 0.94).
-- [ ] `contrast.mjs`: lowest text outside the map still at or above 4.5:1, both themes.
-- [ ] Tests written before wiring for `distinctNames`, `mapHeight`, the label rows on both
-      pages, the histogram without peak text, and the map's end-point labels.
-- [ ] `uv run ruff check .` clean, `uv run pytest tests -q` green, node green, counts shown.
-- [ ] After publishing: the live explorer states and the 13:59 report show 0 pairs. The
+      run by its distinct name. 2026-10-03: 0 repeated names; failed-load.mjs at step 3.
+- [x] Both maps fill at least 0.8 of their box at 390 px (baseline 0.32 and 0.33) and at
+      least 0.9 at 1280 px (now 0.97 and 0.94). 2026-10-03: 0.92 and 0.87 at 390 px, 0.97
+      and 0.94 at 1280 px.
+- [x] `contrast.mjs`: lowest text outside the map still at or above 4.5:1, both themes.
+      2026-10-03: 4.85:1 on the local build and on the live explorer and 13:59 report.
+- [x] Tests written before wiring for `distinctNames`, `mapHeight`, the label rows on both
+      pages, the histogram without peak text, and the map's end-point labels. Each step's
+      evidence names its test; step 9's map_figure test was found written with the code.
+- [x] `uv run ruff check .` clean, `uv run pytest tests -q` green, node green, counts shown.
+      2026-10-03: clean, 133 passed, 177 passed.
+- [x] After publishing: the live explorer states and the 13:59 report show 0 pairs. The
       other three report pages follow when the user republishes them from their terminal.
+      2026-10-03: 0 pairs on the live explorer states and 13:59 at both widths; the
+      2026-09-03 page holds the 33 left, pending the user's republish.
 
 ## Invariants
 

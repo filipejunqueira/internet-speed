@@ -1,14 +1,11 @@
 # TODO — internet-speed
 
-Last updated: 2026-10-01
+Last updated: 2026-10-03
 
 ## Now
 
-PLAN.md is open: no text over text on the site, and every run named apart. It covers the
-label-collision and duplicate-name items below and the phone-map item under Next. Steps
-1 to 9 and 11 are done and pushed; step 10 has passed its local checks (2026-10-01) and
-waits on publishing, and none of it is on the live site yet. The site walk of 2026-09-24 is
-in `notes/site-walk-2026-09-24/README.md`.
+No plan is open. The site walk of 2026-09-24 is in `notes/site-walk-2026-09-24/README.md`,
+and the problems it found that are still open sit under Next.
 
 - [ ] Decide what to do about an old row in `runs/index.json` keeping numbers the code
       no longer agrees with. The table shows 100.0 % worst loss for the three Leeds runs
@@ -35,22 +32,9 @@ in `notes/site-walk-2026-09-24/README.md`.
       per-phase loss figure, so nothing on the page is wrong, and the penalty is sound
       because the replies were split between the phases correctly. Only `pingme
       reanalyse`, in Later, can mend the record. blocked-by: `pingme reanalyse`
-
-- [ ] Fix the labels that collide on three charts: the `warning` threshold text sits
-      under the first legend entry on the busy-delay chart; the histogram stacks all
-      three run names in its top-left corner over the plot and repeats the legend; the
-      map prints all three run names on one point at São Paulo and "You" twice over the
-      UK. Two more of the same kind, found 2026-09-24: on every report page's histogram
-      the "median" and "p95" labels print on top of the legend, and on the report map the
-      US-East label prints over New York's
-
-- [ ] Tell two runs apart when they share a label. Three runs are all called
-      `leeds_bt`, so the legends, the tile headings, the comparison header and the
-      "numbers would not load" sentence all read the same name twice. Colour separates
-      them, the words do not. Candidate: label plus the run's date and time. Since
-      2026-09-24 the map caption's route-date sentences read "leeds_bt: Traced on …
-      leeds_bt: When this route was traced was not recorded.", so they cannot say which
-      run they are about either
+      Since 2026-10-03 those three republishes also carry the no-text-over-text plan:
+      the 2026-09-03 page is the one live page still measuring 33 overlapping pairs,
+      a map at 0.33 of its box on a phone, and 2.19:1 contrast in dark mode
 
 ## Next
 
@@ -61,7 +45,6 @@ in `notes/site-walk-2026-09-24/README.md`.
 
 Found by the site walk on 2026-09-24; evidence in `notes/site-walk-2026-09-24/`.
 
-- [ ] Phone: the explorer's map keeps its desktop height, so two thirds of its card is blank
 - [ ] Throughput: the 13:59 report's upload line sits at zero for its last two seconds, and
       the 2026-09-03 one ends on a zero; both read as the line failing. Cause, found
       2026-09-24 and still in today's code (`route-date-check` ends `…12.54, 0.0, 0.0`):
@@ -81,12 +64,6 @@ Found by the site walk on 2026-09-24; evidence in `notes/site-walk-2026-09-24/`.
 
 Found 2026-10-01 on the local build, after step 9; evidence in `notes/site-walk-2026-10-01/`.
 
-- [x] Phone: with three runs ticked, the explorer histogram's legend wraps to two rows and
-      the second ("leeds_bt 15:32") prints over the top of the plotted outlines
-      (`three-leeds-sp.phone.s04.png`). `overlaps.mjs` cannot see it: it measures text
-      against text, not text against marks. Fixed 2026-10-03: every explorer legend now
-      stands on its foot 8 px above the plot, so a second row grows upward and plotly widens
-      the margin for it (`three-leeds-sp.phone.histogram-after.png`)
 - [ ] Dark mode: map lakes stay white and the black origin star nearly vanishes, on the
       report map and likely the explorer's (`report-1359.desk-dark.s08.png`)
 
@@ -146,6 +123,20 @@ Found 2026-10-01 on the local build, after step 9; evidence in `notes/site-walk-
 - [ ] Scheduled background runs
 
 ## Done
+- 2026-10-03 — No text over text on the site, and every run named apart; plan archived
+  (`notes/plans/2026-10-03_no-text-over-text.plan.md`). Measured with a headless browser
+  rather than judged by eye: `overlaps.mjs` counted 127 overlapping text pairs and 80
+  repeated names on the live site, and now counts 0 of each on every explorer state and
+  the 13:59 report at 1280 and 390 px. Runs sharing a label are told apart by the
+  shortest distinguishing part of their start time ("leeds_bt 13:59"); labels on lines
+  and bands get rows of their own above the plot; the histogram names its runs in the
+  legend only; a shared map end is labelled once and "you" once; both maps size their
+  box from their width, so a phone shows a map and not two thirds of blank card; the
+  report map drops its own title. Found while closing: on a phone a three-run legend
+  wrapped into the plot, fixed by anchoring every explorer legend at its foot. Step 9's
+  code came from a session on 2026-09-28 that left no record; it was checked and kept.
+  The 2026-09-03 report page waits on the user's republish (Now).
+
 - 2026-09-24 — Chart text follows the theme, and captions pass 4.5:1 (433bff8, live in
   site 8467e68). Dark mode left legends and axis titles at 2.19:1, because text given a
   colour of its own ignored the theme repaint; light mode set every caption at 3.5:1. The
