@@ -128,4 +128,8 @@ they are wired in.
   `~/code/internet-speed`, which does not pull by itself) holds `2026-09-21T14-51-12Z`,
   `k-nodes-desktop-cable_2026-09-22T00-19-03Z` and `mudfish105-late_2026-09-22T22-55-48Z`.
   The container and the laptop each have a site clone beside the log; the desktop has none,
-  so it has never published. Read from each machine on 2026-09-23.
+  so it has never published. Read from each machine on 2026-09-23. A run in the laptop
+  terminal's log can be published from Claude's shell without the user's terminal:
+  `XDG_DATA_HOME=/home/filipejunqueira/.local/share uv run pingme publish <id>` picks that
+  log and its site clone, whose remote is SSH, and `publish` pulls before it pushes (three
+  runs published that way on 2026-10-03; the laptop's clone is at a1242c7).

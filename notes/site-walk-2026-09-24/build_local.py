@@ -6,6 +6,10 @@ Copies the site clone (without its .git), writes this checkout's JavaScript into
 rebuilds index.html, and rebuilds every report page from the redacted JSON beside it, which
 is the record a publish would draw it from. Nothing is committed, pushed or published. Serve
 the folder with `python3 -m http.server 8765 --bind 127.0.0.1` and point the .mjs checks at it.
+
+Stop the server by its process number: `pgrep -f "python3 -m http.server 8765"`, then
+`kill <pid>`. `pkill -f "http.server 8765"` also matches the shell running the command and
+kills that shell first (exit 144), so nothing after it runs: bitten 2026-09-24 and 2026-10-01.
 """
 import json
 import shutil
