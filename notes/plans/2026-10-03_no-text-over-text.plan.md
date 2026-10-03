@@ -307,14 +307,17 @@ Approved 2026-09-24 as recommended: decisions 1 to 3 as written, and decision 4 
 - [x] `contrast.mjs`: lowest text outside the map still at or above 4.5:1, both themes.
       2026-10-03: 4.85:1 on the local build and on the live explorer and 13:59 report.
 - [x] Tests written before wiring for `distinctNames`, `mapHeight`, the label rows on both
-      pages, the histogram without peak text, and the map's end-point labels. Each step's
-      evidence names its test; step 9's map_figure test was found written with the code.
+      pages, the histogram without peak text, and the map's end-point labels. Met except
+      for step 9: each other step's evidence names its test; step 9's map_figure test was
+      found written with the code by the unrecorded session, order unknown.
 - [x] `uv run ruff check .` clean, `uv run pytest tests -q` green, node green, counts shown.
       2026-10-03: clean, 133 passed, 177 passed.
 - [x] After publishing: the live explorer states and the 13:59 report show 0 pairs. The
       other three report pages follow when the user republishes them from their terminal.
       2026-10-03: 0 pairs on the live explorer states and 13:59 at both widths; the
-      2026-09-03 page holds the 33 left, pending the user's republish.
+      2026-09-03 page holds the 33 left, pending the user's republish. Later the same
+      day: republished from the container by `XDG_DATA_HOME` (site a1242c7), 0 pairs
+      everywhere; see TODO.md Done.
 
 ## Invariants
 

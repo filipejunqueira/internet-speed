@@ -7,35 +7,6 @@ Last updated: 2026-10-03
 No plan is open. The site walk of 2026-09-24 is in `notes/site-walk-2026-09-24/README.md`,
 and the problems it found that are still open sit under Next.
 
-- [ ] Decide what to do about an old row in `runs/index.json` keeping numbers the code
-      no longer agrees with. The table shows 100.0 % worst loss for the three Leeds runs
-      while their tiles say "6 probes lost, warning", because `publish` replaces only
-      the row of the run it is publishing. Two ways: rewrite every row the machine still
-      has a record for on each publish, or leave old rows alone and republish by hand.
-      Publishing the 13:59 run on 2026-09-10 rewrote its own row, which now reads 0.7 %
-      and 30 s beside two sibling rows still reading 100.0 % and an em dash, so the
-      three Leeds runs now disagree with each other in the same table. The other two are
-      in the user's log: `pingme publish leeds_bt_2026-08-30T15-32` and `...15-15` from
-      their terminal would bring them into line.
-      Since 2026-09-24 that also brings their report pages in line with the explorer.
-      Those pages were built before the route date and say nothing under the map, while
-      the explorer says "When this route was traced was not recorded." for the same runs.
-      `pingme publish 2026-09-03T13-14` (also in the user's log) needs the same. Publish
-      from a clone level with master: the desktop, at 3ac048c, lacks only the `.note`
-      style (78e7a8f), so its pages would carry the sentence unstyled. The same three
-      republishes carry the contrast fix (433bff8) to those pages; until then the
-      2026-09-03 report measures 2.19:1 in dark mode and 3.41:1 in light, and the 15:15 and
-      15:32 pages, built by the same old code, should read the same (not measured).
-      The same cause shows an em dash in the duration column for runs whose record does
-      carry 60 s. Separate from this, the records themselves hold the old per-phase sent
-      counts (São Paulo idle reads 34 % loss on the Leeds runs). The site never shows a
-      per-phase loss figure, so nothing on the page is wrong, and the penalty is sound
-      because the replies were split between the phases correctly. Only `pingme
-      reanalyse`, in Later, can mend the record. blocked-by: `pingme reanalyse`
-      Since 2026-10-03 those three republishes also carry the no-text-over-text plan:
-      the 2026-09-03 page is the one live page still measuring 33 overlapping pairs,
-      a map at 0.33 of its box on a phone, and 2.19:1 contrast in dark mode
-
 ## Next
 
 - [ ] Run `pingme --label <place> --publish` on the next connection, then `pingme compare`
@@ -95,8 +66,17 @@ Found 2026-10-01 on the local build, after step 9; evidence in `notes/site-walk-
       since the 2026-09-24 republish, because `publish` splices fresh traces into an old
       record. A reader trusting the tag would not look for the field. Found 2026-09-24
 
+- [ ] Decide whether `publish` should rewrite every `runs/index.json` row the machine still
+      has a record for, or keep replacing only the row of the run it is publishing. Only
+      the latter happens now, so a row built by old code keeps its old numbers until that
+      run is republished by hand: the three Leeds rows disagreed with each other from
+      2026-09-10 to 2026-10-03 (100.0 % and an em dash beside 0.7 % and 30 s). Republishing
+      mended them; the next code change that touches a row's numbers will open the gap again
 - [ ] `pingme reanalyse [id]`: every record stores its samples, so old runs can be
-      recomputed with the fixed loss accounting and appended as a new record
+      recomputed with the fixed loss accounting and appended as a new record. Separate from
+      the index rows above: the Leeds records themselves hold the old per-phase sent counts
+      (São Paulo idle reads 34 % loss), which the site never shows, so nothing on a page is
+      wrong and the penalty is sound; only this can mend the record
 - [ ] Upload speed over-counts: `speed._upload` counts a block when it enters httpx's
       buffer, not when it leaves the machine. Three streams × 64 KB at the deadline is
       ~8 % on a 2 Mbit/s uplink over 10 s, noise on a fast line. Checked 2026-09-24, and
@@ -123,6 +103,19 @@ Found 2026-10-01 on the local build, after step 9; evidence in `notes/site-walk-
 - [ ] Scheduled background runs
 
 ## Done
+- 2026-10-03 — Every published page is built by today's code. The three runs that live only
+  in the laptop terminal's log (`leeds_bt` 15-32 and 15-15, `2026-09-03T13-14-53Z`) were
+  republished from the container by pointing `XDG_DATA_HOME` at that log, which carried
+  the route date, the contrast fix and the no-text-over-text plan to their pages, and
+  rewrote their index rows: the 15:15 and 15:32 rows now read 0.67 % and 60 s, in line
+  with 13:59 (0.67 %, a 30 s run), where they had read 100.0 % and an em dash since
+  2026-09-10. Their pages kept their own saved traces, so nothing was re-traced on today's
+  line. Live site measured afterwards: `overlaps.mjs` 0 pairs and 0 repeated names across
+  its 12 states, `contrast.mjs` lowest 4.85:1 on the explorer and the 13:59 and 2026-09-03
+  reports (the latter had read 2.19:1 in dark mode). The 15:15 and 15:32 pages are in
+  neither script's list, so they are not measured; they are built by the same code. What
+  to do about stale rows in future is now a Later item.
+
 - 2026-10-03 — No text over text on the site, and every run named apart; plan archived
   (`notes/plans/2026-10-03_no-text-over-text.plan.md`). Measured with a headless browser
   rather than judged by eye: `overlaps.mjs` counted 127 overlapping text pairs and 80
@@ -135,7 +128,7 @@ Found 2026-10-01 on the local build, after step 9; evidence in `notes/site-walk-
   report map drops its own title. Found while closing: on a phone a three-run legend
   wrapped into the plot, fixed by anchoring every explorer legend at its foot. Step 9's
   code came from a session on 2026-09-28 that left no record; it was checked and kept.
-  The 2026-09-03 report page waits on the user's republish (Now).
+  The 2026-09-03 report page followed the same day (the entry above).
 
 - 2026-09-24 — Chart text follows the theme, and captions pass 4.5:1 (433bff8, live in
   site 8467e68). Dark mode left legends and axis titles at 2.19:1, because text given a
