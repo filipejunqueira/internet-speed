@@ -360,3 +360,17 @@ test('labels on lines and bands get rows of their own above the plot, under any 
   assert.deepEqual(shift, { download: 14, upload: 0 })
   assert.ok(timeline.margin.t >= 2 * 14)
 })
+
+test('every legend stands on its foot above the plot, so a second row grows away from it', () => {
+  // On a phone three run names wrap to two rows. A legend hung from its top at 1.08 grew
+  // downward, and the second row printed over the histogram's outlines; plotly widens the
+  // top margin for a legend anchored at its bottom, so the rows go up instead.
+  const plotPx = (layout) => layout.height - layout.margin.t - layout.margin.b
+  for (const layout of [histogramFigure([RUN_A, RUN_B], 'london', TOKENS).layout,
+    overviewFigure([RUN_A, RUN_B], TOKENS).layout]) {
+    assert.equal(layout.showlegend, true)
+    assert.equal(layout.legend.yanchor, 'bottom')
+    // the same 8 px gap the label rows keep under a legend
+    assert.equal(Math.round((layout.legend.y - 1) * plotPx(layout)), 8)
+  }
+})

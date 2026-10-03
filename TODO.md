@@ -81,10 +81,12 @@ Found by the site walk on 2026-09-24; evidence in `notes/site-walk-2026-09-24/`.
 
 Found 2026-10-01 on the local build, after step 9; evidence in `notes/site-walk-2026-10-01/`.
 
-- [ ] Phone: with three runs ticked, the explorer histogram's legend wraps to two rows and
+- [x] Phone: with three runs ticked, the explorer histogram's legend wraps to two rows and
       the second ("leeds_bt 15:32") prints over the top of the plotted outlines
       (`three-leeds-sp.phone.s04.png`). `overlaps.mjs` cannot see it: it measures text
-      against text, not text against marks. Desktop and two runs keep to one row
+      against text, not text against marks. Fixed 2026-10-03: every explorer legend now
+      stands on its foot 8 px above the plot, so a second row grows upward and plotly widens
+      the margin for it (`three-leeds-sp.phone.histogram-after.png`)
 - [ ] Dark mode: map lakes stay white and the black origin star nearly vanishes, on the
       report map and likely the explorer's (`report-1359.desk-dark.s08.png`)
 

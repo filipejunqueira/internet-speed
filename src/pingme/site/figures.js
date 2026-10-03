@@ -374,7 +374,11 @@ function baseLayout(tokens, height, legend) {
     margin: { l: 56, r: 16, t: 24, b: 40 }, height,
     xaxis: { ...axis }, yaxis: { ...axis },
     showlegend: legend,
-    legend: { orientation: 'h', y: 1.08, x: 0, font: { size: 11, color: chrome.ink2 } },
+    // Standing on its foot a gap above the plot: when the names wrap to two rows on a
+    // phone, the second row grows upward and plotly widens the top margin to hold it. Hung
+    // from its top, the legend grew downward and its second row printed over the plot.
+    legend: { orientation: 'h', x: 0, yanchor: 'bottom', y: 1 + LEGEND_GAP_PX / (height - 64),
+      font: { size: 11, color: chrome.ink2 } },
     hoverlabel: { font: { family: tokens.font } }
   }
 }
